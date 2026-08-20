@@ -258,12 +258,19 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
   const [projectHistoryReports, setProjectHistoryReports] = useState<HistoricalReport[]>([]);
   const [isLoadingProjectHistory, setIsLoadingProjectHistory] = useState<boolean>(false);
 
-  // Fetch project history and load latest saved report if available whenever activeProject changes
+  // Fetch project history and load latest saved report if available whenever activeProject changes (Debounced)
   useEffect(() => {
     let isMounted = true;
-    if (activeProject) {
-      setIsLoadingProjectHistory(true);
+    if (!activeProject) {
+      setProjectHistoryReports([]);
+      setIsLoadingProjectHistory(false);
+      setAnalysisResult(null);
+      return;
+    }
 
+    setIsLoadingProjectHistory(true);
+
+    const timer = setTimeout(() => {
       Promise.all([
         ReportHistoryStore.getHistoricalReports(activeProject.id, activeProject.name, activeProject.po),
         ReportHistoryStore.getLatestReport(activeProject.id, activeProject.name, activeProject.po)
@@ -286,14 +293,11 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
           setIsLoadingProjectHistory(false);
           setAnalysisResult(null);
         });
-    } else {
-      setProjectHistoryReports([]);
-      setIsLoadingProjectHistory(false);
-      setAnalysisResult(null);
-    }
+    }, 200);
 
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
   }, [activeProject?.id, activeProject?.name]);
 
@@ -2368,9 +2372,6 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      )}
 
       {/* Previous Project Reports Section */}
       {activeProject && (

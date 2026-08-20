@@ -495,14 +495,16 @@ export default function App() {
       let dbProjects: any[] | null = null;
       let projError: any = null;
 
-      // محاولة الجلب مرتباً بحسب created_at أولاً، وإن فشل نجلب السجلات بدون ترتيب
+      // 🚀 Explicit column projection to reduce Egress Bandwidth
+      const PROJECT_COLUMNS = 'id, operational_number, name, po, unifier_no, contractor, consultant, status, scope, classification, business_unit, region, sub_program, map_url, x, y, surveyor_name, surveyor_phone, created_at';
+
       const res1 = await supabase
         .from('projects')
-        .select('*')
+        .select(PROJECT_COLUMNS)
         .order('created_at', { ascending: false });
 
       if (res1.error) {
-        const res2 = await supabase.from('projects').select('*');
+        const res2 = await supabase.from('projects').select(PROJECT_COLUMNS);
         dbProjects = res2.data;
         projError = res2.error;
       } else {
@@ -671,9 +673,9 @@ export default function App() {
           try {
             const { data, error } = await client
               .from('notifications')
-              .select('*')
+              .select('id, project_id, project_name, type, message, created_at, region, scope')
               .order('created_at', { ascending: false })
-              .limit(100);
+              .limit(40);
 
             if (!error && data) {
               fetchedData = data;
@@ -684,9 +686,9 @@ export default function App() {
 
           try {
             const { data: cData, error: cErr } = await (client.from('project_changelogs') as any)
-              .select('*')
+              .select('id, project_id, project_name, report_id, previous_report_id, diff, created_at')
               .order('created_at', { ascending: false })
-              .limit(100);
+              .limit(30);
 
             if (!cErr && cData) {
               changelogData = cData;

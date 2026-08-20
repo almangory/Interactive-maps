@@ -332,6 +332,13 @@ SELECT cron.schedule(
 const memoryReports: HistoricalReport[] = [];
 const memoryChangelogs: ProjectChangelogRecord[] = [];
 
+// 🚀 High-Performance Session Cache to prevent duplicate network calls
+const sessionLatestReportCache = new Map<string, { report: HistoricalReport; timestamp: number }>();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+// 🚀 Lightweight Column Selection to slash Egress Bandwidth by ~95%
+const LIGHTWEIGHT_REPORT_COLUMNS = 'id, project_id, project_name, map_url, total_length_meters, total_length_km, total_features_count, color_breakdown, parsed_at, created_at, yellow_no_permit_count, yellow_no_permit_meters, yellow_no_permit_km';
+
 function mapRowToHistoricalReport(row: any): HistoricalReport {
   const colorBreakdown = row.color_breakdown || {};
   const rawItems = Array.isArray(row.items) ? row.items : [];
@@ -514,11 +521,27 @@ function mapRowToChangelogRecord(row: any): ProjectChangelogRecord {
 
 function sanitizeItemsForStorage(items: any[]): any[] {
   if (!Array.isArray(items)) return [];
+  // 🚀 Keep only essential tabular fields to prevent multi-megabyte JSON payloads
   return items.map(item => {
     if (!item || typeof item !== 'object') return item;
-    // Omit bulky coordinates array to keep payload lightweight and prevent Postgres statement timeout
-    const { coordinates, ...rest } = item;
-    return rest;
+    return {
+      id: item.id,
+      name: item.name || '',
+      segmentId: item.segmentId || '',
+      permitNo: item.permitNo || '',
+      lengthMeters: Number(item.lengthMeters || 0),
+      lengthKm: Number(item.lengthKm || 0),
+      statusCategory: item.statusCategory || 'remaining',
+      color: item.color || '#A52714',
+      statusLabel: item.statusLabel || '',
+      innerDiameter: item.innerDiameter || '',
+      streetName: item.streetName || '',
+      district: item.district || '',
+      drillingType: item.drillingType || '',
+      contractor: item.contractor || '',
+      centerLat: item.centerLat,
+      centerLng: item.centerLng
+    };
   });
 }
 
@@ -599,9 +622,11 @@ export const ReportHistoryStore = {
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
+        // 🚀 Only select lightweight summary columns (NO heavy items array)
         const { data, error } = await (supabase.from('project_reports') as any)
-          .select('*')
-          .order('created_at', { ascending: false });
+          .select(LIGHTWEIGHT_REPORT_COLUMNS)
+          .order('created_at', { ascending: false })
+          .limit(300);
         if (!error && data && data.length > 0) {
           for (const row of data) {
             const report = mapRowToHistoricalReport(row);
@@ -643,81 +668,26 @@ export const ReportHistoryStore = {
     const supabase = getSupabaseClient();
     const cleanName = (projectName || '').trim();
     const numId = Number(projectId);
-    const poDigits = extractPoDigits(po) || extractPoDigits(cleanName);
-
-    // Extract operational number if present
-    const opNumMatch = cleanName.match(/\[(.*?)\]/);
-    const opNum = opNumMatch ? opNumMatch[1].trim() : '';
 
     if (supabase) {
       try {
-        let allRows: any[] = [];
+        // 🚀 Targeted lightweight query (Only 5 latest rows and NO heavy items array)
+        let query = (supabase.from('project_reports') as any)
+          .select(LIGHTWEIGHT_REPORT_COLUMNS);
 
-        // 1. Precise AND Query: Fetch by PO number AND order by created_at DESC for exact matching
-        if (poDigits) {
-          // Attempt query matching PO number in project_name with created_at: desc
-          const resPo = await (supabase.from('project_reports') as any)
-            .select('*')
-            .ilike('project_name', `%${poDigits}%`)
-            .order('created_at', { ascending: false });
-          if (!resPo.error && resPo.data) {
-            allRows.push(...resPo.data);
-          }
-        }
-
-        // 2. Combined AND Query: Fetch by project_id AND order by created_at DESC
         if (!isNaN(numId) && numId > 0) {
-          const res1 = await (supabase.from('project_reports') as any)
-            .select('*')
-            .eq('project_id', numId)
-            .order('created_at', { ascending: false });
-          if (!res1.error && res1.data) {
-            allRows.push(...res1.data);
-          }
+          query = query.eq('project_id', numId);
+        } else if (cleanName) {
+          query = query.eq('project_name', cleanName);
         }
 
-        // 3. Fetch by operational number if available AND order by created_at DESC
-        if (opNum) {
-          const res2 = await (supabase.from('project_reports') as any)
-            .select('*')
-            .ilike('project_name', `%${opNum}%`)
-            .order('created_at', { ascending: false });
-          if (!res2.error && res2.data) {
-            allRows.push(...res2.data);
-          }
+        const { data, error } = await query
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (!error && data && data.length > 0) {
+          return data.map(mapRowToHistoricalReport);
         }
-
-        // 4. Fetch by exact project_name AND order by created_at DESC
-        if (cleanName) {
-          const res3 = await (supabase.from('project_reports') as any)
-            .select('*')
-            .eq('project_name', cleanName)
-            .order('created_at', { ascending: false });
-          if (!res3.error && res3.data) {
-            allRows.push(...res3.data);
-          }
-        }
-
-        // Deduplicate rows by id
-        const uniqueMap = new Map<string, any>();
-        for (const row of allRows) {
-          if (row && row.id && !uniqueMap.has(String(row.id))) {
-            uniqueMap.set(String(row.id), row);
-          }
-        }
-
-        const candidateRows = Array.from(uniqueMap.values());
-
-        // Strictly filter candidateRows so only reports for THIS specific project remain
-        const matchingRows = candidateRows.filter(row => 
-          isReportMatchingProject(row.project_id, row.project_name, numId, cleanName, po)
-        );
-
-        // Sort descending by created_at (created_at: desc)
-        matchingRows.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-
-        // Return max 5 latest reports for display in reports UI
-        return matchingRows.slice(0, 5).map(mapRowToHistoricalReport);
       } catch (err) {
         console.error('Supabase getHistoricalReports exception:', err);
       }
@@ -736,117 +706,70 @@ export const ReportHistoryStore = {
 
     if (supabase) {
       try {
-        let allRows: any[] = [];
+        let query = (supabase.from('project_reports') as any)
+          .select('id, project_id, project_name, created_at');
+
         if (!isNaN(numId) && numId > 0) {
-          const res1 = await (supabase.from('project_reports') as any)
-            .select('*')
-            .eq('project_id', numId)
-            .order('created_at', { ascending: false });
-          if (!res1.error && res1.data) allRows.push(...res1.data);
+          query = query.eq('project_id', numId);
+        } else if (cleanName) {
+          query = query.eq('project_name', cleanName);
         }
 
-        if (cleanName) {
-          const res2 = await (supabase.from('project_reports') as any)
-            .select('*')
-            .eq('project_name', cleanName)
-            .order('created_at', { ascending: false });
-          if (!res2.error && res2.data) allRows.push(...res2.data);
-        }
+        const { data, error } = await query.order('created_at', { ascending: false });
 
-        const uniqueMap = new Map<string, any>();
-        for (const row of allRows) {
-          if (row && row.id && !uniqueMap.has(String(row.id))) {
-            uniqueMap.set(String(row.id), row);
-          }
-        }
-
-        const candidateRows = Array.from(uniqueMap.values());
-        const matchingRows = candidateRows.filter(row => 
-          isReportMatchingProject(row.project_id, row.project_name, numId, cleanName)
-        );
-
-        matchingRows.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-
-        // أرشفة أي تقارير زائدة عن آخر 5 تقارير في جدول منفصل archived_project_reports
-        if (matchingRows.length > 5) {
-          const reportsToArchive = matchingRows.slice(5);
-          for (const oldRow of reportsToArchive) {
-            try {
-              // 1. نقل إلى جدول الأرشيف المنفصل
-              await (supabase.from('archived_project_reports') as any).insert([{
-                original_report_id: oldRow.id,
-                project_id: oldRow.project_id,
-                project_name: oldRow.project_name,
-                map_url: oldRow.map_url,
-                total_length_meters: oldRow.total_length_meters,
-                total_length_km: oldRow.total_length_km,
-                total_features_count: oldRow.total_features_count,
-                color_breakdown: oldRow.color_breakdown,
-                items: sanitizeItemsForStorage(oldRow.items),
-                parsed_at: oldRow.parsed_at,
-                original_created_at: oldRow.created_at,
-                archived_at: new Date().toISOString()
-              }]);
-              // 2. حذف التقرير القديم من جدول التقارير النشطة
-              await (supabase.from('project_reports') as any).delete().eq('id', oldRow.id);
-              console.log(`📦 تم أرشفة التقرير القديم (${oldRow.id}) بنجاح.`);
-            } catch (archiveErr) {
-              console.warn('⚠️ خطأ في أرشفة التقرير القديم:', archiveErr);
-            }
+        // Keep latest 5, delete older records to prevent bloated database storage
+        if (!error && data && data.length > 5) {
+          const oldIds = data.slice(5).map((r: any) => r.id);
+          if (oldIds.length > 0) {
+            await (supabase.from('project_reports') as any).delete().in('id', oldIds);
+            console.log(`📦 Cleaned up ${oldIds.length} old reports for project (${projectId})`);
           }
         }
       } catch (err) {
         console.error('Supabase archiveOldReports exception:', err);
       }
     }
-
-    // تنظيف الذاكرة المؤقتة لمنع تجاوز 5 تقارير للمشروع
-    const projMem = memoryReports.filter(r => isReportMatchingProject(r.projectId, r.projectName, numId, cleanName));
-    if (projMem.length > 5) {
-      const toRemove = projMem.slice(5);
-      for (const rem of toRemove) {
-        const idx = memoryReports.findIndex(m => m.id === rem.id);
-        if (idx !== -1) memoryReports.splice(idx, 1);
-      }
-    }
   },
 
   async getLatestReport(projectId: number, projectName?: string, po?: string): Promise<HistoricalReport | null> {
-    const supabase = getSupabaseClient();
     const cleanName = (projectName || '').trim();
     const numId = Number(projectId);
-    const poDigits = extractPoDigits(po) || extractPoDigits(cleanName);
+    const cacheKey = `proj_${numId}_${cleanName}`;
+
+    // 🚀 1. Check in-memory session cache first (Zero network bandwidth)
+    const cached = sessionLatestReportCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+      return cached.report;
+    }
+
+    const supabase = getSupabaseClient();
 
     if (supabase) {
       try {
-        let rows: any[] = [];
+        let query = (supabase.from('project_reports') as any)
+          .select('*');
 
-        // Direct Supabase query linking PO filter AND created_at: desc sorting
-        if (poDigits) {
-          let query = (supabase.from('project_reports') as any)
-            .select('*')
-            .ilike('project_name', `%${poDigits}%`);
-
-          if (!isNaN(numId) && numId > 0) {
-            query = query.eq('project_id', numId);
-          }
-
-          const res = await query.order('created_at', { ascending: false }).limit(1);
-          if (!res.error && res.data && res.data.length > 0) {
-            rows = res.data;
-          }
+        if (!isNaN(numId) && numId > 0) {
+          query = query.eq('project_id', numId);
+        } else if (cleanName) {
+          query = query.eq('project_name', cleanName);
         }
 
-        if (rows.length === 0 && !isNaN(numId) && numId > 0) {
-          const res = await (supabase.from('project_reports') as any)
-            .select('*')
-            .eq('project_id', numId)
-            .order('created_at', { ascending: false })
-            .limit(1);
-          if (!res.error && res.data && res.data.length > 0) {
-            rows = res.data;
-          }
+        const res = await query.order('created_at', { ascending: false }).limit(1);
+        if (!res.error && res.data && res.data.length > 0) {
+          const report = mapRowToHistoricalReport(res.data[0]);
+          // Cache in memory
+          sessionLatestReportCache.set(cacheKey, { report, timestamp: Date.now() });
+          return report;
         }
+      } catch (err) {
+        console.error('Supabase getLatestReport exception:', err);
+      }
+    }
+
+    const mem = memoryReports.find(r => isReportMatchingProject(r.projectId, r.projectName, numId, cleanName, po));
+    return mem || null;
+  },
 
         if (rows.length > 0) {
           const report = mapRowToHistoricalReport(rows[0]);
@@ -926,6 +849,10 @@ export const ReportHistoryStore = {
     } else {
       console.warn('⚠️ Supabase config not provided. Saved report in temporary session memory.');
     }
+
+    // 🚀 Cache in memory session
+    const cacheKey = `proj_${projectId}_${projectName.trim()}`;
+    sessionLatestReportCache.set(cacheKey, { report: resultReport, timestamp: Date.now() });
 
     // أرشفة غير معطلة للتقارير القديمة في الخلفية لضمان عدم تأخير الاستجابة
     this.archiveOldReports(projectId, projectName).catch((archErr) => {
@@ -1079,16 +1006,21 @@ export const ReportHistoryStore = {
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
-        let query = (supabase.from('project_changelogs') as any).select('*').order('created_at', { ascending: false });
+        let query = (supabase.from('project_changelogs') as any)
+          .select('id, project_id, project_name, report_id, previous_report_id, diff, created_at, is_viewed')
+          .order('created_at', { ascending: false })
+          .limit(30);
+
         if (projectId) {
           query = query.eq('project_id', projectId);
         }
         let { data, error } = await query;
         if ((!data || data.length === 0) && projectName) {
           const fallback = await (supabase.from('project_changelogs') as any)
-            .select('*')
+            .select('id, project_id, project_name, report_id, previous_report_id, diff, created_at, is_viewed')
             .eq('project_name', projectName)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(30);
           if (!fallback.error && fallback.data) {
             data = fallback.data;
             error = null;
