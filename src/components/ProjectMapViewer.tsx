@@ -20,7 +20,6 @@ import { KMLAnalysisResult } from '../types';
 import { handleLoadMyMapsLink, generateSyntheticProjectKMLData } from '../utils/myMapsKmlParser';
 import { useLanguage } from '../utils/i18n';
 import { 
-  Map, 
   Maximize2, 
   Minimize2, 
   Shield, 

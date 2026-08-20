@@ -2368,6 +2368,9 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
 
       {/* Previous Project Reports Section */}
       {activeProject && (

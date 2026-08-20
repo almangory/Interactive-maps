@@ -22,7 +22,7 @@ import {
   Tag,
   Plus,
   Edit3,
-  Map,
+  Map as MapIcon,
   Activity
 } from 'lucide-react';
 import { Project, User as UserType } from '../types';
@@ -436,7 +436,7 @@ export const ChangelogTab: React.FC<ChangelogTabProps> = ({
                     {log.changeType === 'add' ? (
                       <Plus className="h-4 w-4" />
                     ) : log.changeType === 'map_update' ? (
-                      <Map className="h-4 w-4" />
+                      <MapIcon className="h-4 w-4" />
                     ) : (
                       <Edit3 className="h-4 w-4" />
                     )}
