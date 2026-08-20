@@ -1,0 +1,10 @@
+{
+  "name": "2نظام إدارة وعرض خرائط شبكات المياه والصرف الصحي",
+  "description": "منصة تفاعلية آمنة لعرض وتعديل خرائط مشاريع شبكات المياه، الصرف الصحي، الخزانات، ومحطات المعالجة، مع نظام دقيق لإدارة الصلاحيات والمستخدمين.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

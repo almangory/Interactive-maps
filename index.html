@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <script>
+      // Global PWA prompt listener captured as early as possible
+      window.deferredPWAInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.deferredPWAInstallPrompt = e;
+        console.log('PWA beforeinstallprompt captured globally');
+      });
+      window.addEventListener('appinstalled', () => {
+        window.deferredPWAInstallPrompt = null;
+        console.log('PWA successfully installed');
+      });
+
+      // Register Service Worker explicitly
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('PWA SW registered successfully:', reg.scope))
+            .catch(err => console.warn('PWA SW registration failed:', err));
+        });
+      }
+
+      // Instantly catch any errors from external cross-origin iframes or CDNs
+      window.onerror = function(message, source, lineno, colno, error) {
+        console.warn("Global suppressed script error:", message, "from", source);
+        return true; // Completely suppress
+      };
+      window.addEventListener('error', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }, { capture: true });
+      window.addEventListener('unhandledrejection', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }, { capture: true });
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#1e40af" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="الخرائط التفاعلية" />
+    <meta name="application-name" content="الخرائط التفاعلية" />
+    <title>الخرائط التفاعلية</title>
+    
+    <!-- أيقونة علامة التبويب والـ PWA للجوال والكمبيوتر -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="shortcut icon" type="image/png" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    
+    <!-- أيقونات تطبيقات الجوال (Android / PWA) -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/pwa-512x512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png" />
+    
+    <!-- ملف الـ Manifest لتحديد الهوية البصرية أثناء التثبيت -->
+    <link rel="manifest" href="/manifest.json" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,66 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background glow -->
+    <radialGradient id="nwcGlow" cx="60" cy="60" r="50">
+      <stop offset="0%" stop-color="#0EA5E9" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </radialGradient>
+    
+    <!-- Outer light blue crescent gradient -->
+    <linearGradient id="skyBlueGrad" x1="15" y1="60" x2="105" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E0F2FE" />
+      <stop offset="50%" stop-color="#93C5FD" />
+      <stop offset="100%" stop-color="#2563EB" />
+    </linearGradient>
+
+    <!-- White sphere with 3D gradient -->
+    <radialGradient id="whiteSphereGrad" cx="68" cy="48" r="38" fx="65" fy="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="60%" stop-color="#F1F6F9" />
+      <stop offset="85%" stop-color="#D5E1E9" />
+      <stop offset="100%" stop-color="#BACCD8" />
+    </radialGradient>
+
+    <!-- Deep Ocean blue crescent gradient -->
+    <linearGradient id="deepOceanGrad" x1="15" y1="30" x2="60" y2="102" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0284C7" />
+      <stop offset="40%" stop-color="#0369A1" />
+      <stop offset="100%" stop-color="#1E3A8A" />
+    </linearGradient>
+
+    <!-- Teal wave ribbon gradient -->
+    <linearGradient id="tealGrad" x1="30" y1="30" x2="60" y2="90" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2DD4BF" />
+      <stop offset="50%" stop-color="#0D9488" />
+      <stop offset="100%" stop-color="#0F766E" />
+    </linearGradient>
+  </defs>
+
+  <!-- Glowing background -->
+  <circle cx="60" cy="60" r="55" fill="url(#nwcGlow)" />
+
+  <!-- Outer Ring (Circle of diameter 90) -->
+  <circle cx="60" cy="60" r="45" fill="url(#skyBlueGrad)" />
+
+  <!-- 3D White Sphere overlaying the right-center -->
+  <path
+    d="M 72,17 A 43,43 0 0,1 105,60 A 43,43 0 0,1 64,103 C 88,101 103,82 101,60 C 99,38 84,21 72,17 Z"
+    fill="url(#whiteSphereGrad)"
+  />
+
+  <!-- Deep Ocean Blue Crescent Sweep on the left -->
+  <path
+    d="M 28,34 C 18,46 14,64 22,80 C 28,92 40,100 54,102 C 40,94 32,80 34,62 C 36,46 46,36 58,32 C 46,28 36,28 28,34 Z"
+    fill="url(#deepOceanGrad)"
+  />
+
+  <!-- Teal Wave Transition Ribbon -->
+  <path
+    d="M 38,40 C 32,50 30,62 35,74 C 39,82 48,88 58,88 C 48,82 42,72 43,58 C 44,46 50,40 58,36 C 50,34 43,35 38,40 Z"
+    fill="url(#tealGrad)"
+    opacity="0.95"
+  />
+
+  <!-- Glossy Reflection Highlights -->
+  <ellipse cx="68" cy="46" rx="8" ry="12" fill="#FFFFFF" opacity="0.25" transform="rotate(-15 68 46)" />
+</svg>
