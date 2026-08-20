@@ -321,10 +321,11 @@ export function matchStatusCategory(colorHex: string, textContext: string = ''):
 }
 
 /**
- * Fetch a URL using server proxy endpoint first, with fallback proxies
+ * Fetch a URL using the internal server-side proxy route or direct fetch
+ * (Strictly avoids third-party public proxies to prevent infrastructure data leakage)
  */
 async function fetchUrlWithProxy(targetUrl: string): Promise<string> {
-  // 1. Try our internal server-side proxy route first (bypasses browser CORS completely)
+  // 1. Try our internal server-side proxy route first
   try {
     const internalProxyUrl = `/api/fetch-kml?url=${encodeURIComponent(targetUrl)}`;
     const resp = await fetch(internalProxyUrl);
@@ -335,32 +336,29 @@ async function fetchUrlWithProxy(targetUrl: string): Promise<string> {
       }
     }
   } catch (e) {
-    // Internal proxy route not available or failed, try public proxies
+    // Internal proxy route not available or network error
   }
 
-  // 2. Public CORS proxy generators fallback
-  const proxyGenerators = [
-    (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-    (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-    (u: string) => u
-  ];
-
-  for (const getProxyUrl of proxyGenerators) {
-    try {
-      const proxyUrl = getProxyUrl(targetUrl);
-      const resp = await fetch(proxyUrl, { cache: 'no-cache' });
-      if (resp.ok) {
-        const text = await resp.text();
-        if (text && (text.includes('<kml') || text.includes('<Placemark') || text.includes('<Document') || text.includes('<xml'))) {
-          return text;
-        }
+  // 2. Try direct fetch with credentials omitted for CORS compliance
+  try {
+    const directResp = await fetch(targetUrl, { 
+      cache: 'no-cache',
+      credentials: 'omit',
+      headers: {
+        'Accept': 'application/vnd.google-earth.kml+xml, application/xml, text/xml'
       }
-    } catch (e) {
-      // try next proxy silently
+    });
+    if (directResp.ok) {
+      const text = await directResp.text();
+      if (text && (text.includes('<kml') || text.includes('<Placemark') || text.includes('<Document') || text.includes('<xml'))) {
+        return text;
+      }
     }
+  } catch (e) {
+    // Direct fetch blocked by CORS or network
   }
 
-  throw new Error(`تعذر جلب البيانات من الرابط: ${targetUrl}`);
+  throw new Error(`تعذر جلب ملف الخارطة التفاعلية بأمان من الرابط: ${targetUrl}. يرجى التأكد من إتاحة الوصول للملف.`);
 }
 
 /**

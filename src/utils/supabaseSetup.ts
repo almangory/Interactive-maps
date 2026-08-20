@@ -143,55 +143,105 @@ ALTER TABLE public.dashboard_project_metrics
   ADD COLUMN IF NOT EXISTS yellow_no_permit_segments JSONB DEFAULT '[]'::jsonb;
 
 -- ==========================================
--- 6. تفعيل سياسات الأمان Row Level Security (RLS)
+-- 6. جدول المشاريع (projects)
 -- ==========================================
+CREATE TABLE IF NOT EXISTS public.projects (
+  id BIGINT PRIMARY KEY,
+  operational_number TEXT,
+  name TEXT NOT NULL,
+  po TEXT,
+  unifier_no TEXT,
+  contractor TEXT,
+  consultant TEXT,
+  status TEXT,
+  scope TEXT,
+  classification TEXT,
+  business_unit TEXT,
+  region TEXT,
+  sub_program TEXT,
+  map_url TEXT,
+  x NUMERIC,
+  y NUMERIC,
+  surveyor_name TEXT,
+  surveyor_phone TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ==========================================
+-- 7. جدول المستخدمين (users)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.users (
+  id TEXT PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'viewer',
+  password TEXT,
+  allowed_regions JSONB DEFAULT '["الكل"]'::jsonb,
+  allowed_scopes JSONB DEFAULT '["الكل"]'::jsonb,
+  allowed_tabs JSONB DEFAULT '["maps", "stats", "layers"]'::jsonb,
+  allowed_layers JSONB DEFAULT '["water", "sewage", "materials"]'::jsonb,
+  allowed_project_ids JSONB DEFAULT '[]'::jsonb,
+  can_open_external_links BOOLEAN DEFAULT TRUE,
+  can_filter BOOLEAN DEFAULT TRUE,
+  can_insert BOOLEAN DEFAULT TRUE,
+  department TEXT DEFAULT '',
+  job_title TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ==========================================
+-- 8. تفعيل سياسات الأمان Row Level Security (RLS) الصارمة
+-- ==========================================
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.archived_project_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_changelogs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dashboard_project_metrics ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Allow read access for all authenticated users" ON public.project_reports;
-DROP POLICY IF EXISTS "Allow insert access for all authenticated users" ON public.project_reports;
-DROP POLICY IF EXISTS "Allow read access for all users" ON public.project_reports;
-DROP POLICY IF EXISTS "Allow insert access for all users" ON public.project_reports;
+-- 🛡️ سياسات جدول المشاريع (projects): قراءة للجميع، وتعديل/إضافة للمصرح لهم
+DROP POLICY IF EXISTS "Allow read projects" ON public.projects;
+CREATE POLICY "Allow read projects" ON public.projects FOR SELECT USING (true);
 
-CREATE POLICY "Allow read access for all users" 
-ON public.project_reports FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow modify projects" ON public.projects;
+CREATE POLICY "Allow modify projects" ON public.projects FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Allow insert access for all users" 
-ON public.project_reports FOR INSERT WITH CHECK (true);
+-- 🛡️ سياسات جدول المستخدمين (users)
+DROP POLICY IF EXISTS "Allow read users" ON public.users;
+CREATE POLICY "Allow read users" ON public.users FOR SELECT USING (true);
 
-DROP POLICY IF EXISTS "Allow read access for archived reports" ON public.archived_project_reports;
-DROP POLICY IF EXISTS "Allow insert access for archived reports" ON public.archived_project_reports;
+DROP POLICY IF EXISTS "Allow modify users" ON public.users;
+CREATE POLICY "Allow modify users" ON public.users FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Allow read access for archived reports" 
-ON public.archived_project_reports FOR SELECT USING (true);
+-- 🛡️ سياسات التقارير وسجلات التغييرات والإشعارات
+DROP POLICY IF EXISTS "Allow read project_reports" ON public.project_reports;
+CREATE POLICY "Allow read project_reports" ON public.project_reports FOR SELECT USING (true);
 
-CREATE POLICY "Allow insert access for archived reports" 
-ON public.archived_project_reports FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow insert project_reports" ON public.project_reports;
+CREATE POLICY "Allow insert project_reports" ON public.project_reports FOR INSERT WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Allow read access for changelogs" ON public.project_changelogs;
-DROP POLICY IF EXISTS "Allow insert access for changelogs" ON public.project_changelogs;
+DROP POLICY IF EXISTS "Allow read archived_reports" ON public.archived_project_reports;
+CREATE POLICY "Allow read archived_reports" ON public.archived_project_reports FOR SELECT USING (true);
 
-CREATE POLICY "Allow read access for changelogs" 
-ON public.project_changelogs FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert archived_reports" ON public.archived_project_reports;
+CREATE POLICY "Allow insert archived_reports" ON public.archived_project_reports FOR INSERT WITH CHECK (true);
 
-CREATE POLICY "Allow insert access for changelogs" 
-ON public.project_changelogs FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow read changelogs" ON public.project_changelogs;
+CREATE POLICY "Allow read changelogs" ON public.project_changelogs FOR SELECT USING (true);
 
-DROP POLICY IF EXISTS "Allow read access for notifications" ON public.notifications;
-DROP POLICY IF EXISTS "Allow insert access for notifications" ON public.notifications;
+DROP POLICY IF EXISTS "Allow insert changelogs" ON public.project_changelogs;
+CREATE POLICY "Allow insert changelogs" ON public.project_changelogs FOR INSERT WITH CHECK (true);
 
-CREATE POLICY "Allow read access for notifications" 
-ON public.notifications FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow read notifications" ON public.notifications;
+CREATE POLICY "Allow read notifications" ON public.notifications FOR SELECT USING (true);
 
-CREATE POLICY "Allow insert access for notifications" 
-ON public.notifications FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow insert notifications" ON public.notifications;
+CREATE POLICY "Allow insert notifications" ON public.notifications FOR INSERT WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Allow all access for dashboard metrics" ON public.dashboard_project_metrics;
-CREATE POLICY "Allow all access for dashboard metrics" 
-ON public.dashboard_project_metrics FOR ALL USING (true);
+DROP POLICY IF EXISTS "Allow all dashboard_metrics" ON public.dashboard_project_metrics;
+CREATE POLICY "Allow all dashboard_metrics" ON public.dashboard_project_metrics FOR ALL USING (true);
 `;
 
 /**

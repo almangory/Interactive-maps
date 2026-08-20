@@ -56,6 +56,36 @@ const SCOPE_OPTIONS = [
   'صرف صحي'
 ];
 
+// 🛡️ Cryptographically secure random password generator (CSPRNG)
+function generateSecurePassword(length: number = 12): string {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const special = '!@#$%^&*';
+  const allChars = upper + lower + digits + special;
+  
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+    const randomBytes = new Uint8Array(length);
+    window.crypto.getRandomValues(randomBytes);
+    let pwd = [
+      upper[randomBytes[0] % upper.length],
+      lower[randomBytes[1] % lower.length],
+      digits[randomBytes[2] % digits.length],
+      special[randomBytes[3] % special.length]
+    ];
+    for (let i = 4; i < length; i++) {
+      pwd.push(allChars[randomBytes[i] % allChars.length]);
+    }
+    // Fisher-Yates shuffle using cryptographically secure values
+    for (let i = pwd.length - 1; i > 0; i--) {
+      const j = randomBytes[i % randomBytes.length] % (i + 1);
+      [pwd[i], pwd[j]] = [pwd[j], pwd[i]];
+    }
+    return pwd.join('');
+  }
+  return 'Nwc#' + Math.random().toString(36).substring(2, 10);
+}
+
 export function UserManagement({ 
   users, 
   currentUser, 
@@ -200,7 +230,7 @@ export function UserManagement({
       department: '',
       jobTitle: '',
       allowedProjectIds: [],
-      password: 'nwc' + Math.floor(1000 + Math.random() * 9000)
+      password: generateSecurePassword(12)
     });
   };
 
@@ -341,6 +371,12 @@ export function UserManagement({
       return;
     }
 
+    const passwordCandidate = formData.password ? formData.password.trim() : '';
+    if (passwordCandidate && passwordCandidate.length < 6) {
+      alert('كلمة المرور يجب ألا تقل عن 6 خانات لضمان أمان الحساب.');
+      return;
+    }
+
     const savedUser: User = {
       id: formData.id || `user_${Date.now()}`,
       username: prefix,
@@ -348,7 +384,7 @@ export function UserManagement({
       role: formData.role as 'admin' | 'editor' | 'viewer',
       allowedRegions: formData.allowedRegions || ['الكل'],
       allowedScopes: formData.allowedScopes || ['الكل'],
-      password: formData.password ? formData.password.trim() : 'nwc1234',
+      password: passwordCandidate || generateSecurePassword(12),
       
       // New fields mapping
       allowedTabs: formData.allowedTabs || ['maps', 'stats', 'layers'],

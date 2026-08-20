@@ -1219,8 +1219,13 @@ export default function App() {
           return;
         }
 
-        // إذا لم يكن هناك أي حساب مدير في قاعدة البيانات نهائياً، ننشئ حساب مدير تلقائياً ونحفظه في سوبابيس
-        const defaultPassword = adminPassword.trim() || 'admin123';
+        // إذا لم يكن هناك أي حساب مدير في قاعدة البيانات نهائياً، ننشئ حساب مدير تلقائياً بكلمة المرور المدخلة
+        if (!adminPassword.trim() || adminPassword.trim().length < 6) {
+          setLoginError('يرجى إدخال كلمة مرور قوية لا تقل عن 6 خانات لتهيئة حساب المشرف.');
+          setIsLoading(false);
+          return;
+        }
+        const defaultPassword = adminPassword.trim();
         const newAdminUser = {
           id: 'admin-' + Date.now(),
           username: 'admin',

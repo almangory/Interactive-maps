@@ -77,6 +77,56 @@ export default defineConfig(() => {
                 return;
               }
 
+              // 🛡️ Strict SSRF Protection: Validate target URL domain & protocol
+              let parsedTarget: URL;
+              try {
+                parsedTarget = new URL(targetUrl);
+              } catch {
+                res.statusCode = 400;
+                res.end('Invalid target URL format');
+                return;
+              }
+
+              if (parsedTarget.protocol !== 'https:' && parsedTarget.protocol !== 'http:') {
+                res.statusCode = 403;
+                res.end('Forbidden: Only HTTP/HTTPS protocols are allowed');
+                return;
+              }
+
+              const hostname = parsedTarget.hostname.toLowerCase();
+
+              // Block private and loopback IP addresses / hostnames
+              const isPrivateHost = 
+                hostname === 'localhost' ||
+                hostname === '127.0.0.1' ||
+                hostname === '0.0.0.0' ||
+                hostname === '::1' ||
+                hostname.startsWith('10.') ||
+                hostname.startsWith('192.168.') ||
+                hostname === '169.254.169.254' ||
+                /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+
+              if (isPrivateHost) {
+                res.statusCode = 403;
+                res.end('Forbidden: Access to private and local network resources is blocked (SSRF Protection)');
+                return;
+              }
+
+              // Whitelist allowed Google Maps & trusted GIS domains
+              const isAllowedDomain = 
+                hostname === 'google.com' ||
+                hostname.endsWith('.google.com') ||
+                hostname === 'googleusercontent.com' ||
+                hostname.endsWith('.googleusercontent.com') ||
+                hostname === 'maps.googleapis.com' ||
+                hostname === 'earth.google.com';
+
+              if (!isAllowedDomain) {
+                res.statusCode = 403;
+                res.end('Forbidden: Target domain is not permitted for KML fetching');
+                return;
+              }
+
               const response = await fetch(targetUrl, {
                 headers: {
                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -92,7 +142,7 @@ export default defineConfig(() => {
 
               const xmlText = await response.text();
               res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.setHeader('X-Content-Type-Options', 'nosniff');
               res.end(xmlText);
             } catch (err: any) {
               res.statusCode = 500;
