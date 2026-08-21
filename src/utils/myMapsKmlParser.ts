@@ -523,6 +523,97 @@ export function parseKmlCoordinatesText(text: string): Array<[number, number]> {
  * Preserves the actual identifier content including all numbers, letters, and symbols/signs (e.g. SEG-101, 12/A, #44-B, 400-W-01, 24/19/01).
  * Truncates before any concatenated downstream field headers (like Permit No:, Stage:, etc.).
  */
+export interface IdentifierAuditResult {
+  raw: string;
+  isEmpty: boolean; // True if empty, only '-' or invalid placeholder (من النواقص)
+  isValid: boolean; // True if compliant with standards
+  hasLeadingDash?: boolean; // For Segment ID: has '-' before content
+  isNonDigits?: boolean; // For Permit No: not pure digits or contains spaces/dashes
+  warningMessage?: string; // Alert message describing the detected issue
+}
+
+/**
+ * 🔍 Audit and detect format compliance for Segment ID (Detection Only - No Mutation)
+ * Rule: Must NOT contain '-' before the content. If only '-', it is considered empty/non-existent (النواقص).
+ */
+export function auditSegmentId(val: any): IdentifierAuditResult {
+  if (val === null || val === undefined) {
+    return { raw: '', isEmpty: true, isValid: false, warningMessage: 'غير مسجل (من النواقص)' };
+  }
+  const raw = String(val).trim();
+  if (!raw) {
+    return { raw: '', isEmpty: true, isValid: false, warningMessage: 'غير مسجل (من النواقص)' };
+  }
+
+  const lower = raw.toLowerCase();
+  const invalidKeywords = [
+    '-', '/', '--', '//', '---', '///', '-/-', '- / -', '-/', '/-', '/ -', '- /', 'n/a', 'na', 'none', 'null',
+    'undefined', 'بدون', 'لا يوجد', 'لايوجد', 'غير محدد', 'غير متوفر', 'فراغ', 'بدون سجمنت', 'لا يوجد سجمنت', '0', '00', '000', '0000', 'nan'
+  ];
+
+  if (invalidKeywords.includes(lower) || /^[-–—_#/\\:;.\s]+$/.test(raw)) {
+    return { raw, isEmpty: true, isValid: false, warningMessage: 'فارغ / يحتوي على (-) فقط (من النواقص)' };
+  }
+
+  // Detection: Check if starts with '-' before content
+  if (/^[-–—]/.test(raw)) {
+    return {
+      raw,
+      isEmpty: false,
+      isValid: false,
+      hasLeadingDash: true,
+      warningMessage: 'تنبيه تنسيق: يحتوي على (-) قبل محتوى البيان'
+    };
+  }
+
+  return { raw, isEmpty: false, isValid: true };
+}
+
+/**
+ * 🔍 Audit and detect format compliance for Permit No (Detection Only - No Mutation)
+ * Rule: Must contain PURE DIGITS ONLY without leading spaces, trailing spaces, dashes (-), or letters.
+ * If only '-', it is considered empty/non-existent (النواقص).
+ */
+export function auditPermitNo(val: any): IdentifierAuditResult {
+  if (val === null || val === undefined) {
+    return { raw: '', isEmpty: true, isValid: false, warningMessage: 'بدون فسح (من النواقص)' };
+  }
+  const raw = String(val).trim();
+  if (!raw) {
+    return { raw: '', isEmpty: true, isValid: false, warningMessage: 'بدون فسح (من النواقص)' };
+  }
+
+  const lower = raw.toLowerCase();
+  const invalidKeywords = [
+    '-', '/', '--', '//', '---', '///', '-/-', '- / -', '-/', '/-', '/ -', '- /', 'n/a', 'na', 'none', 'null',
+    'undefined', 'بدون', 'لا يوجد', 'لايوجد', 'غير محدد', 'غير متوفر', 'فراغ', 'بدون تصريح', 'بدون فسح', 'لا', 'لايوجد تصريح',
+    'لا يوجد تصريح', 'لا يوجد فسح', 'لايوجد فسح', 'بدون سجمنت', 'لا يوجد سجمنت', '0', '00', '000', '0000', 'nan'
+  ];
+
+  if (invalidKeywords.includes(lower) || /^[-–—_#/\\:;.\s]+$/.test(raw)) {
+    return { raw, isEmpty: true, isValid: false, warningMessage: 'فارغ / يحتوي على (-) فقط (من النواقص)' };
+  }
+
+  // Detection: Check if strictly digits only (without leading spaces, dashes, or letters)
+  const isAllDigits = /^[0-9٠-٩]+$/.test(raw);
+  if (!isAllDigits || /^[-–—\s]/.test(val) || /[^0-9٠-٩]/.test(raw)) {
+    return {
+      raw,
+      isEmpty: false,
+      isValid: false,
+      isNonDigits: true,
+      warningMessage: 'تنبيه تنسيق: رقم الفسح يجب أن يحتوي على أرقام فقط وبدون فراغ أو (-)'
+    };
+  }
+
+  return { raw, isEmpty: false, isValid: true };
+}
+
+/**
+ * Strips field statement prefixes like "Segment ID:", "Segment ID =", etc.
+ * Preserves the actual user content as-is (Detection Only - No silent mutation).
+ * Returns empty string ('') if value is only '-' or invalid placeholder (considered missing/نواقص).
+ */
 export function cleanSegmentId(val: any): string {
   if (val === null || val === undefined) return '';
   let str = String(val).trim();
@@ -539,17 +630,12 @@ export function cleanSegmentId(val: any): string {
     str = str.substring(0, match.index).trim();
   }
 
-  // 3. Clean leading/trailing quotes, colons, equals, or stray whitespace
-  str = str.replace(/^["'`\s:=–—_#/\\]+|["'`\s:=–—_#/\\]+$/g, '').trim();
-
-  // 4. Specifically strip any leading hyphens/dashes before content (e.g. -SEG-01 -> SEG-01, -101 -> 101, - 24/19/01 -> 24/19/01)
-  str = str.replace(/^[-–—]+\s*/, '').trim();
-  str = str.replace(/[-–—]+$/, '').trim();
+  // 3. Clean outer quotes only, preserve internal characters and dashes
+  str = str.replace(/^["'`]+|["'`]+$/g, '').trim();
 
   if (!str) return '';
 
-  // 5. Check if the value contains only '-' or invalid placeholder words
-  // If it contains only '-', it is considered empty/non-existent (classified as missing data / نواقص)
+  // 4. If value is '-' only or placeholder, return '' (considered missing data / نواقص)
   const lower = str.toLowerCase();
   const invalidKeywords = [
     '-', '/', '--', '//', '---', '///', '-/-', '- / -', '-/', '/-', '/ -', '- /', 'n/a', 'na', 'none', 'null',
@@ -561,36 +647,24 @@ export function cleanSegmentId(val: any): string {
     return '';
   }
 
-  // 6. Must contain at least one alphanumeric character (Arabic/English digit or letter)
-  const alphanumericOnly = str.replace(/[^A-Za-z0-9\u0600-\u06FF]/g, '');
-  if (alphanumericOnly.length === 0) return '';
-
-  if (['id', 'segment', 'seg', 'sec', 'null', 'undefined', 'none', 'nan'].includes(alphanumericOnly.toLowerCase())) {
-    return '';
-  }
-
   return str;
 }
 
 /**
  * Strips label prefixes like "Permit No:", "permit_no:", etc.
- * Returns strictly the pure DIGITS ONLY (أرقام فقط) of the Permit No without any leading space, trailing space, hyphens (-), or letters.
- * If value contains only '-' or invalid placeholders, returns empty string ('') (considered empty/non-existent / نواقص).
+ * Preserves the actual user content as-is (Detection Only - No silent mutation).
+ * Returns empty string ('') if value is only '-' or invalid placeholder (considered missing/نواقص).
  */
 export function cleanPermitNo(val: any): string {
   if (val === null || val === undefined) return '';
   let str = String(val).trim();
   if (!str) return '';
 
-  // 1. Convert Arabic-Indic digits (٠-٩) to standard English digits (0-9)
-  const arabicDigits: Record<string, string> = { '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9' };
-  str = str.replace(/[٠-٩]/g, d => arabicDigits[d] || d);
-
-  // 2. Remove Permit No prefixes strictly
+  // 1. Remove Permit No prefixes strictly
   str = str.replace(/^(?:permit\s*no|permit_no|permitno|permit-no|permit\s*number|permit_number|permit\s*num|permit_num|permit\s*#|permit_id|perm_no|permno|perm\s*no|perm\s*num|رقم\s*الفسح|رقم\s*التصريح|الفسح|التصريح|فسح|تصريح)\s*[:=–—#=-]\s*/i, '');
   str = str.replace(/^(?:permit\s*no|permit_no|permitno|perm_no|الفسح|التصريح)\s+/i, '');
 
-  // 3. Truncate before any downstream joined field labels if concatenated
+  // 2. Truncate before any downstream joined field labels if concatenated
   const downstreamRegex = /(?:^|\s+)(?:-|–|—)?\s*(?:ZONE|ZONE_NO|DRILLING|DRILLING_TYPE|DRILLINGTYPE|STAGE|CONTRACTOR|CONTRACTOR_NAME|PROJECTNAME|PROJECT_NAME|PROJECTID|PROJECT_ID|SHAPE_LENGTH|SHAPE_Length|SHAPE_LEN|STREETNAME|STREET_NAME|DISTRICT|INNERDIAMETER|INNER_DIAMETER|SEGMENT|SEGMENTID|SEGMENT_ID|SEG_ID|OBJECTID|FID|المقاول|الحي|الشارع|المرحلة)\s*[:=]/i;
   const match = str.match(downstreamRegex);
   if (match && match.index !== undefined) {
@@ -600,12 +674,12 @@ export function cleanPermitNo(val: any): string {
     str = str.substring(0, match.index).trim();
   }
 
-  // 4. Clean leading/trailing quotes, colons, equals, dashes, slashes, spaces
-  str = str.replace(/^["'`\s:=–—_#/\\;,.]+|["'`\s:=–—_#/\\;,.]+$/g, '').trim();
+  // 3. Clean outer quotes only, preserve internal characters
+  str = str.replace(/^["'`]+|["'`]+$/g, '').trim();
 
   if (!str) return '';
 
-  // 5. Check if the value contains only '-' or invalid placeholder words
+  // 4. If value is '-' only or placeholder, return '' (considered missing data / نواقص)
   const lower = str.toLowerCase();
   const invalidKeywords = [
     '-', '/', '--', '//', '---', '///', '-/-', '- / -', '-/', '/-', '/ -', '- /', 'n/a', 'na', 'none', 'null',
@@ -617,24 +691,11 @@ export function cleanPermitNo(val: any): string {
     return '';
   }
 
-  // 6. Extract strictly PURE DIGITS ONLY (أرقام فقط) without any spaces, dashes, or letters
-  const digitsMatch = str.match(/\b(\d{3,20})\b/) || str.match(/(\d+)/);
-  if (digitsMatch) {
-    const pureDigits = digitsMatch[1].trim();
-    if (pureDigits && parseInt(pureDigits, 10) > 0) {
-      return pureDigits;
-    }
-  }
-
-  return '';
+  return str;
 }
 
 /**
- * Strict Extraction of Permit No from Placemark elements, HTML description table rows, or structured text.
- * Strictly searches for the "Permit No" header/statement only (Permit No, Permit_No, PermitNo, Permit Number, Perm_No)
- * and retrieves only its corresponding value.
- */
-export function extractStrictPermitNo(
+ * Strict Extractionexport function extractStrictPermitNo(
   pm?: Element | null,
   rawDescription: string = '',
   descText: string = '',

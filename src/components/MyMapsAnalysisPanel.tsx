@@ -16,6 +16,8 @@ import {
   isValidIdentifier,
   cleanSegmentId,
   cleanPermitNo,
+  auditSegmentId,
+  auditPermitNo,
   isYellowItemWithoutPermit,
   isRedItemWithoutSegmentId
 } from '../utils/myMapsKmlParser';
@@ -1989,30 +1991,64 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                         <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
                           <td className="p-3 font-mono text-slate-400">{index + 1}</td>
                           <td className="p-3 font-mono font-bold text-slate-900 dark:text-slate-100">
-                            <span 
-                              onClick={() => setSelectedFeatureForModal(item)}
-                              className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded border border-slate-200 dark:border-slate-700 cursor-pointer transition-colors"
-                              title="انقر لعرض تفاصيل وموقع القطاع"
-                            >
-                              {item.segmentId}
-                            </span>
+                            {(() => {
+                              const segAudit = auditSegmentId(item.segmentId);
+                              if (segAudit.isEmpty) {
+                                return (
+                                  <span 
+                                    onClick={() => setSelectedFeatureForModal(item)}
+                                    className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                                    title="غير مسجل (من النواقص)"
+                                  >
+                                    غير مسجل (نواقص) ❌
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span 
+                                  onClick={() => setSelectedFeatureForModal(item)}
+                                  className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded border border-slate-200 dark:border-slate-700 cursor-pointer transition-colors"
+                                  title={segAudit.warningMessage || 'انقر لعرض تفاصيل وموقع القطاع'}
+                                >
+                                  <span>{item.segmentId}</span>
+                                  {segAudit.hasLeadingDash && (
+                                    <span className="text-[10px] px-1 py-0.2 bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 rounded font-bold" title="تنبيه تنسيق: يحتوي على (-) قبل محتوى البيان">
+                                      ⚠️ يبدأ بـ (-)
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="p-3 font-mono font-bold text-slate-800 dark:text-slate-200">
-                            <span 
-                              onClick={() => setSelectedFeatureForModal(item)}
-                              className="cursor-pointer transition-colors"
-                              title="انقر لعرض تفاصيل وموقع الفسح"
-                            >
-                              {cleanPermitNo(item.permitNo) ? (
-                                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 rounded border border-slate-200 dark:border-slate-700 text-emerald-800 dark:text-emerald-200">
-                                  {cleanPermitNo(item.permitNo)}
+                            {(() => {
+                              const permAudit = auditPermitNo(item.permitNo);
+                              if (permAudit.isEmpty) {
+                                return (
+                                  <span 
+                                    onClick={() => setSelectedFeatureForModal(item)}
+                                    className={`px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer ${isYellowItemWithoutPermit(item) ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700'}`}
+                                    title={isYellowItemWithoutPermit(item) ? 'بدون تصريح (من النواقص للخطوط الصفراء)' : 'غير مسجل'}
+                                  >
+                                    {isYellowItemWithoutPermit(item) ? '🚨 بدون تصريح (من النواقص)' : 'غير مسجل ❌'}
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span 
+                                  onClick={() => setSelectedFeatureForModal(item)}
+                                  className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 rounded border border-slate-200 dark:border-slate-700 text-emerald-800 dark:text-emerald-200 cursor-pointer"
+                                  title={permAudit.warningMessage || 'انقر لعرض تفاصيل وموقع الفسح'}
+                                >
+                                  <span>{item.permitNo}</span>
+                                  {permAudit.isNonDigits && (
+                                    <span className="text-[10px] px-1 py-0.2 bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 rounded font-bold" title="تنبيه تنسيق: رقم الفسح يجب أن يحتوي على أرقام فقط وبدون فراغ أو (-)">
+                                      ⚠️ غير رقمي / يحتوي (-)
+                                    </span>
+                                  )}
                                 </span>
-                              ) : (
-                                <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${isYellowItemWithoutPermit(item) ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700'}`}>
-                                  {isYellowItemWithoutPermit(item) ? '🚨 بدون تصريح صريح (يحتوي - أو /)' : 'غير مسجل ❌'}
-                                </span>
-                              )}
-                            </span>
+                              );
+                            })()}
                           </td>
                           <td className="p-3">
                             {getStatusBadge(item.statusCategory)}
@@ -2201,22 +2237,36 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                           <tr key={item.id || idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
                             <td className="p-3 font-mono text-slate-400 font-bold">{idx + 1}</td>
                             <td className="p-3">
-                              <input
-                                type="text"
-                                value={item.segmentId || ''}
-                                onChange={(e) => handleUpdateItemSegmentOrPermit(item.id, 'segmentId', e.target.value)}
-                                placeholder="SEG-..."
-                                className="w-36 bg-blue-50/60 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 text-xs font-mono font-bold px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                              />
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  value={item.segmentId || ''}
+                                  onChange={(e) => handleUpdateItemSegmentOrPermit(item.id, 'segmentId', e.target.value)}
+                                  placeholder="SEG-..."
+                                  className="w-36 bg-blue-50/60 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 text-xs font-mono font-bold px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                />
+                                {auditSegmentId(item.segmentId).hasLeadingDash && (
+                                  <span className="text-[10px] px-1 py-0.5 bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 rounded font-bold border border-amber-300 dark:border-amber-700" title="تنبيه: يحتوي على (-) قبل محتوى البيان">
+                                    ⚠️
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="p-3">
-                              <input
-                                type="text"
-                                value={item.permitNo || ''}
-                                onChange={(e) => handleUpdateItemSegmentOrPermit(item.id, 'permitNo', e.target.value)}
-                                placeholder="PERM-..."
-                                className="w-36 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 text-xs font-mono font-bold px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                              />
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  value={item.permitNo || ''}
+                                  onChange={(e) => handleUpdateItemSegmentOrPermit(item.id, 'permitNo', e.target.value)}
+                                  placeholder="رقم الفسح..."
+                                  className="w-36 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 text-xs font-mono font-bold px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                                />
+                                {auditPermitNo(item.permitNo).isNonDigits && (
+                                  <span className="text-[10px] px-1 py-0.5 bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 rounded font-bold border border-amber-300 dark:border-amber-700" title="تنبيه: رقم الفسح يجب أن يحتوي على أرقام فقط وبدون فراغ أو (-)">
+                                    ⚠️
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="p-3 font-bold text-slate-800 dark:text-slate-200 max-w-xs truncate" title={item.name}>
                               {item.name}
