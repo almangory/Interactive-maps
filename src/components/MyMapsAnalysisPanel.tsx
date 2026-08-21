@@ -510,10 +510,8 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
       const result = await handleLoadMyMapsLink(url, proj.name, proj.scope);
       await processAndSaveAnalysis(result, proj);
     } catch (err: any) {
-      console.error(err);
-      const proj = activeProject || ({ id: 999, name: projName || 'مشروع عام', mapUrl: url } as Project);
-      const synthetic = generateSyntheticProjectKMLData(proj.name, url, proj.scope);
-      await processAndSaveAnalysis(synthetic, proj);
+      console.error('Error loading analysis from map URL:', err);
+      showToast(`⚠️ تعذر جلب وتحليل بيانات الخريطة من الرابط: ${err.message || 'يرجى التحقق من صلاحية الوصول للخريطة'}`);
     } finally {
       setIsLoading(false);
     }

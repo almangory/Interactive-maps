@@ -1097,18 +1097,17 @@ export function parseKMLContent(xmlString: string, projectName: string = 'مشر
   const items: KMLFeatureItem[] = [];
 
   placemarks.forEach((pm, idx) => {
-    // Strict Filter: Process ONLY LineString/Line geometry features, ignoring standalone Points/Polygons/Markers
+    // Process all GIS placemarks (LineString, Track, MultiLineString, Polygon, LinearRing, MultiGeometry)
     const allChildElements = Array.from(pm.getElementsByTagName('*'));
     
-    // Find all line geometry nodes (LineString, Track, MultiLineString)
+    // Find all line and polygon geometry nodes
     const lineStringNodes = allChildElements.filter(el => {
       const name = (el.localName || el.tagName || '').toLowerCase();
-      return name === 'linestring' || name === 'track' || name === 'multilinestring';
+      return name === 'linestring' || name === 'track' || name === 'multilinestring' || name === 'linearring' || name === 'polygon';
     });
 
-    if (lineStringNodes.length === 0) {
-      return; // Skip non-LineString placemarks (Points, Polygons, Markers)
-    }
+    // Also look for coordinates elements directly in Placemark if no wrapper node found
+    const directCoordsNodes = lineStringNodes.length === 0 ? Array.from(pm.getElementsByTagName('coordinates')) : [];
 
     const name = pm.getElementsByTagName('name')[0]?.textContent?.trim() || `قطاع خط ${idx + 1}`;
     const description = pm.getElementsByTagName('description')[0]?.textContent?.trim() || '';
@@ -1276,9 +1275,13 @@ export function parseKMLContent(xmlString: string, projectName: string = 'مشر
     let sumLng = 0;
     let validPtsCount = 0;
 
-    lineStringNodes.forEach(ls => {
+    const targetGeomNodes = lineStringNodes.length > 0 ? lineStringNodes : directCoordsNodes;
+    targetGeomNodes.forEach(ls => {
       let coordsText = '';
-      const coordsNode = Array.from(ls.getElementsByTagName('*')).find(el => (el.localName || el.tagName || '').toLowerCase() === 'coordinates');
+      const coordsNode = (ls.localName || ls.tagName || '').toLowerCase() === 'coordinates' 
+        ? ls 
+        : Array.from(ls.getElementsByTagName('*')).find(el => (el.localName || el.tagName || '').toLowerCase() === 'coordinates');
+      
       if (coordsNode && coordsNode.textContent) {
         coordsText = coordsNode.textContent;
       } else {
@@ -1615,11 +1618,6 @@ export async function handleLoadMyMapsLink(
   projectScope?: string
 ): Promise<KMLAnalysisResult> {
   const name = projectName || 'تحليل الخريطة التفاعلية';
-  try {
-    const kmlXml = await fetchMyMapsKML(link);
-    return parseKMLContent(kmlXml, name, link, projectScope);
-  } catch (err) {
-    console.warn('handleLoadMyMapsLink fetch error, using synthetic analysis dataset:', err);
-    return generateSyntheticProjectKMLData(name, link, projectScope);
-  }
+  const kmlXml = await fetchMyMapsKML(link);
+  return parseKMLContent(kmlXml, name, link, projectScope);
 }
