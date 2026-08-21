@@ -171,3 +171,43 @@ export const auditNonCompliantColors = (items: Array<{ id: string; color?: strin
     totalLengthKm: Number((summary.totalLengthMeters / 1000).toFixed(3))
   })).sort((a, b) => b.totalLengthMeters - a.totalLengthMeters);
 };
+
+export interface RedNoSegmentSummary {
+  count: number;
+  totalLengthMeters: number;
+  totalLengthKm: number;
+  items: Array<{ id: string; name?: string; lengthMeters?: number; layerName?: string }>;
+}
+
+/**
+ * Audits and aggregates all red lines (#a52714) that lack a valid Segment ID.
+ */
+export const auditRedNoSegmentItems = (items: Array<any>): RedNoSegmentSummary => {
+  const redNoSeg = items.filter(it => {
+    if (!it || typeof it !== 'object') return false;
+    const color = (it.colorHex || it.color_hex || it.color || it.hex || '').toLowerCase().trim();
+    const isRed = color === '#a52714' || color === '#d93025' || color === '#c5221f' ||
+                  color === '#ea4335' || color === '#e53935' || color === '#ef4444' ||
+                  color === '#dc2626' || color.includes('red') ||
+                  (it.statusCategory === 'remaining') || (it.statusLabel && it.statusLabel.includes('متبقي'));
+    if (!isRed) return false;
+    const rawSeg = it.segmentId !== undefined ? it.segmentId : (it.segment_id !== undefined ? it.segment_id : (it as any)['Segment ID']);
+    if (rawSeg === null || rawSeg === undefined) return true;
+    const str = String(rawSeg).trim();
+    return !str || str === '-' || /^[-–—_#/\\:;.\s]+$/.test(str);
+  });
+
+  const totalMeters = redNoSeg.reduce((acc, it) => acc + (it.lengthMeters || 0), 0);
+  return {
+    count: redNoSeg.length,
+    totalLengthMeters: totalMeters,
+    totalLengthKm: Number((totalMeters / 1000).toFixed(3)),
+    items: redNoSeg.map(it => ({
+      id: it.id,
+      name: it.name,
+      lengthMeters: it.lengthMeters,
+      layerName: it.layerName
+    }))
+  };
+};
+

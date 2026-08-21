@@ -113,6 +113,10 @@ export interface ColorStatsSummary {
   yellowNoPermitMeters?: number;
   yellowNoPermitKm?: number;
   yellowNoPermitSegments?: string[];
+  redNoSegmentCount?: number;
+  redNoSegmentMeters?: number;
+  redNoSegmentKm?: number;
+  redNoSegmentFeatures?: string[];
 }
 
 export interface KMLAnalysisResult {
@@ -142,6 +146,12 @@ export interface KMLAnalysisResult {
     lengthMeters: number;
     lengthKm: number;
     segments: string[];
+  };
+  redNoSegmentStats?: {
+    count: number;
+    lengthMeters: number;
+    lengthKm: number;
+    features: string[];
   };
   items: KMLFeatureItem[];
   parsedAt: string;

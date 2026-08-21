@@ -7,8 +7,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Project, StatusCategory, KMLAnalysisResult, HistoricalReport } from '../types';
 import { ReportHistoryStore, extractPoDigits, isReportMatchingProject, findReportForProject } from '../utils/reportsStore';
 import { DashboardMetricsStore, DashboardProjectMetric } from '../utils/dashboardMetricsStore';
-import { generateSyntheticProjectKMLData, getStatusCategoryLabel, isValidIdentifier, cleanSegmentId, cleanPermitNo, cleanStage, isYellowItemWithoutPermit } from '../utils/myMapsKmlParser';
+import { generateSyntheticProjectKMLData, getStatusCategoryLabel, isValidIdentifier, cleanSegmentId, cleanPermitNo, cleanStage, isYellowItemWithoutPermit, isRedItemWithoutSegmentId } from '../utils/myMapsKmlParser';
 import { YellowNoPermitModal, YellowNoPermitItemDetail } from './YellowNoPermitModal';
+import { RedNoSegmentModal, RedNoSegmentItemDetail } from './RedNoSegmentModal';
 import { useLanguage } from '../utils/i18n';
 import * as XLSX from 'xlsx';
 import {
@@ -19,6 +20,7 @@ import {
   Layers,
   CheckCircle2,
   AlertTriangle,
+  AlertOctagon,
   RefreshCw,
   Globe,
   MapPin,
@@ -54,6 +56,7 @@ interface CategoryStats {
   totalSegmentsCount: number;
   uniqueSegmentsCount: number;
   yellowNoPermitItems: YellowNoPermitItemDetail[];
+  redNoSegmentItems: RedNoSegmentItemDetail[];
   statusBreakdown: Record<StatusCategory, {
     category: StatusCategory;
     label: string;
@@ -68,6 +71,9 @@ interface CategoryStats {
     yellowNoPermitCount?: number;
     yellowNoPermitMeters?: number;
     yellowNoPermitKm?: number;
+    redNoSegmentCount?: number;
+    redNoSegmentMeters?: number;
+    redNoSegmentKm?: number;
   }>;
 }
 
@@ -85,6 +91,11 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
   const [isYellowNoPermitModalOpen, setIsYellowNoPermitModalOpen] = useState<boolean>(false);
   const [yellowModalProjectScope, setYellowModalProjectScope] = useState<string>('جميع المشاريع');
   const [selectedYellowModalItems, setSelectedYellowModalItems] = useState<YellowNoPermitItemDetail[] | null>(null);
+
+  // Red Items Without Segment ID Modal State
+  const [isRedNoSegmentModalOpen, setIsRedNoSegmentModalOpen] = useState<boolean>(false);
+  const [redModalProjectScope, setRedModalProjectScope] = useState<string>('جميع المشاريع');
+  const [selectedRedModalItems, setSelectedRedModalItems] = useState<RedNoSegmentItemDetail[] | null>(null);
 
   // Dynamically compute list of available statuses from projects
   const availableStatuses = useMemo(() => {
@@ -281,6 +292,7 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
 
     const categories: StatusCategory[] = ['executed_water', 'executed_sewage', 'ongoing', 'remaining', 'cancelled'];
     const collectedYellowNoPermitItems: YellowNoPermitItemDetail[] = [];
+    const collectedRedNoSegmentItems: RedNoSegmentItemDetail[] = [];
 
     const breakdownMap: Record<StatusCategory, {
       category: StatusCategory;
@@ -295,12 +307,14 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
       projectSet: Set<number>;
       yellowNoPermitCount: number;
       yellowNoPermitMeters: number;
+      redNoSegmentCount: number;
+      redNoSegmentMeters: number;
     }> = {
-      executed_water: { category: 'executed_water', label: 'منفذ - شبكات مياه', hex: '#01579B', totalMeters: 0, totalKm: 0, percentage: 0, permitSet: new Set(), segmentSet: new Set(), segmentTotalCount: 0, projectSet: new Set(), yellowNoPermitCount: 0, yellowNoPermitMeters: 0 },
-      executed_sewage: { category: 'executed_sewage', label: 'منفذ - شبكات صرف صحي', hex: '#097138', totalMeters: 0, totalKm: 0, percentage: 0, permitSet: new Set(), segmentSet: new Set(), segmentTotalCount: 0, projectSet: new Set(), yellowNoPermitCount: 0, yellowNoPermitMeters: 0 },
-      ongoing: { category: 'ongoing', label: 'جاري العمل / التنفيذ', hex: '#ffea00', totalMeters: 0, totalKm: 0, percentage: 0, permitSet: new Set(), segmentSet: new Set(), segmentTotalCount: 0, projectSet: new Set(), yellowNoPermitCount: 0, yellowNoPermitMeters: 0 },
-      remaining: { category: 'remaining', label: 'أعمال متبقية', hex: '#a52714', totalMeters: 0, totalKm: 0, percentage: 0, permitSet: new Set(), segmentSet: new Set(), segmentTotalCount: 0, projectSet: new Set(), yellowNoPermitCount: 0, yellowNoPermitMeters: 0 },
-      cancelled: { category: 'cancelled', label: 'خطوط تم إلغائها', hex: '#F48FB1', totalMeters: 0, totalKm: 0, percentage: 0, permitSet: new Set(), segmentSet: new Set(), segmentTotalCount: 0, projectSet: new Set(), yellowNoPermitCount: 0, yellowNoPermitMeters: 0 }
+      executed_water: { category: 'executed_water', label: 'منفذ - شبكات مياه', hex: '#01579B', totalMeters: 0, totalKm: 0, percentage: 0, permitSet: new Set(), segmentSet: new Set(), segmentTotalCount: 0, projectSet: new Set(), yellowNoPermitCount: 0, yellowNoPermitMeters: 0, redNoSegmentCount: 0, redNoSegmentMeters: 0 },
+      executed_sewage: { category: 'executed_sewage', label: 'منفذ - شبكات صرف صحي', hex: '#097138', totalMeters: 0, totalKm: 0, percentage: 0, permitSet: new Set(), segmentSet: new Set(), segmentTotalCount: 0, projectSet: new Set(), yellowNoPermitCount: 0, yellowNoPermitMeters: 0, redNoSegmentCount: 0, redNoSegmentMeters: 0 },
+      ongoing: { category: 'ongoing', label: 'جاري العمل / التنفيذ', hex: '#ffea00', totalMeters: 0, totalKm: 0, percentage: 0, permitSet: new Set(), segmentSet: new Set(), segmentTotalCount: 0, projectSet: new Set(), yellowNoPermitCount: 0, yellowNoPermitMeters: 0, redNoSegmentCount: 0, redNoSegmentMeters: 0 },
+      remaining: { category: 'remaining', label: 'أعمال متبقية', hex: '#a52714', totalMeters: 0, totalKm: 0, percentage: 0, permitSet: new Set(), segmentSet: new Set(), segmentTotalCount: 0, projectSet: new Set(), yellowNoPermitCount: 0, yellowNoPermitMeters: 0, redNoSegmentCount: 0, redNoSegmentMeters: 0 },
+      cancelled: { category: 'cancelled', label: 'خطوط تم إلغائها', hex: '#F48FB1', totalMeters: 0, totalKm: 0, percentage: 0, permitSet: new Set(), segmentSet: new Set(), segmentTotalCount: 0, projectSet: new Set(), yellowNoPermitCount: 0, yellowNoPermitMeters: 0, redNoSegmentCount: 0, redNoSegmentMeters: 0 }
     };
 
     catProjects.forEach(p => {
@@ -344,6 +358,8 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
 
         let projYellowCount = 0;
         let projYellowMeters = 0;
+        let projRedCount = 0;
+        let projRedMeters = 0;
 
         if (res.items && Array.isArray(res.items) && res.items.length > 0) {
           res.items.forEach(item => {
@@ -371,6 +387,41 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
                 lengthMeters: item.lengthMeters || 0,
                 lengthKm: item.lengthKm || Number(((item.lengthMeters || 0) / 1000).toFixed(3)),
                 stage: item.stage || 'غير متوفر',
+                streetName: item.streetName || item.name,
+                district: item.district,
+                innerDiameter: item.innerDiameter,
+                zone: item.zone,
+                drillingType: item.drillingType,
+                centerLat: item.centerLat,
+                centerLng: item.centerLng,
+                googleMapsUrl: item.googleMapsUrl,
+                coordinates: item.coordinates,
+                featureItem: item,
+                projectObj: p
+              });
+            }
+
+            if (isRedItemWithoutSegmentId(item)) {
+              projRedCount++;
+              projRedMeters += (item.lengthMeters || 0);
+              breakdownMap.remaining.redNoSegmentCount++;
+              breakdownMap.remaining.redNoSegmentMeters += (item.lengthMeters || 0);
+
+              collectedRedNoSegmentItems.push({
+                id: item.id || `red-${p.id}-${collectedRedNoSegmentItems.length + 1}`,
+                projectId: p.id,
+                projectName: p.name,
+                po: p.po,
+                contractor: item.contractor || p.contractor || 'غير محدد',
+                classification: p.classification,
+                region: p.region,
+                subProgram: p.subProgram,
+                scope: p.scope,
+                segmentId: item.segmentId || '',
+                permitNo: item.permitNo || '',
+                name: item.name || `خط متبقي ${collectedRedNoSegmentItems.length + 1}`,
+                lengthMeters: item.lengthMeters || 0,
+                lengthKm: item.lengthKm || Number(((item.lengthMeters || 0) / 1000).toFixed(3)),
                 streetName: item.streetName || item.name,
                 district: item.district,
                 innerDiameter: item.innerDiameter,
@@ -457,6 +508,62 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
                   lengthMeters: Math.round(ynResMeters / ynResCount),
                   lengthKm: Number((ynResMeters / ynResCount / 1000).toFixed(3)),
                   stage: 'جاري العمل',
+                  streetName: p.name,
+                  projectObj: p
+                });
+              }
+            }
+          }
+        }
+
+        // If items loop did not yield red without segment ID, check res.redNoSegmentStats or colorBreakdown or metric
+        if (projRedCount === 0) {
+          const rnResCount = res.redNoSegmentStats?.count || (res.colorBreakdown?.remaining as any)?.redNoSegmentCount || (res.colorBreakdown as any)?.redNoSegmentStats?.count || metric?.redNoSegmentCount || 0;
+          const rnResMeters = res.redNoSegmentStats?.lengthMeters || (res.colorBreakdown?.remaining as any)?.redNoSegmentMeters || (res.colorBreakdown as any)?.redNoSegmentStats?.lengthMeters || metric?.redNoSegmentMeters || 0;
+          const rnFeatures = res.redNoSegmentStats?.features || (res.colorBreakdown?.remaining as any)?.redNoSegmentFeatures || (res.colorBreakdown as any)?.redNoSegmentStats?.features || metric?.redNoSegmentFeatures || [];
+
+          if (rnResCount > 0) {
+            breakdownMap.remaining.redNoSegmentCount = (breakdownMap.remaining.redNoSegmentCount || 0) + rnResCount;
+            breakdownMap.remaining.redNoSegmentMeters = (breakdownMap.remaining.redNoSegmentMeters || 0) + rnResMeters;
+
+            if (rnFeatures && rnFeatures.length > 0) {
+              rnFeatures.forEach((fName: string, rIdx: number) => {
+                collectedRedNoSegmentItems.push({
+                  id: `red-res-${p.id}-${rIdx + 1}`,
+                  projectId: p.id,
+                  projectName: p.name,
+                  po: p.po,
+                  contractor: p.contractor || 'غير محدد',
+                  classification: p.classification,
+                  region: p.region,
+                  subProgram: p.subProgram,
+                  scope: p.scope,
+                  segmentId: '',
+                  permitNo: '',
+                  name: fName || `خط متبقي ${rIdx + 1}`,
+                  lengthMeters: Math.round(rnResMeters / (rnFeatures.length || 1)),
+                  lengthKm: Number((rnResMeters / (rnFeatures.length || 1) / 1000).toFixed(3)),
+                  streetName: p.name,
+                  projectObj: p
+                });
+              });
+            } else {
+              for (let i = 0; i < rnResCount; i++) {
+                collectedRedNoSegmentItems.push({
+                  id: `red-res-${p.id}-${i + 1}`,
+                  projectId: p.id,
+                  projectName: p.name,
+                  po: p.po,
+                  contractor: p.contractor || 'غير محدد',
+                  classification: p.classification,
+                  region: p.region,
+                  subProgram: p.subProgram,
+                  scope: p.scope,
+                  segmentId: '',
+                  permitNo: '',
+                  name: `خط متبقي بدون سجمنت ${i + 1}`,
+                  lengthMeters: Math.round(rnResMeters / rnResCount),
+                  lengthKm: Number((rnResMeters / rnResCount / 1000).toFixed(3)),
                   streetName: p.name,
                   projectObj: p
                 });
@@ -559,6 +666,35 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
           }
         }
 
+        // Add redNoSegment metrics if available from metric
+        if (metric.redNoSegmentCount && metric.redNoSegmentCount > 0) {
+          breakdownMap.remaining.redNoSegmentCount = (breakdownMap.remaining.redNoSegmentCount || 0) + metric.redNoSegmentCount;
+          breakdownMap.remaining.redNoSegmentMeters = (breakdownMap.remaining.redNoSegmentMeters || 0) + (metric.redNoSegmentMeters || 0);
+
+          if (metric.redNoSegmentFeatures && metric.redNoSegmentFeatures.length > 0) {
+            metric.redNoSegmentFeatures.forEach((fName, fIdx) => {
+              collectedRedNoSegmentItems.push({
+                id: `red-metric-${p.id}-${fIdx + 1}`,
+                projectId: p.id,
+                projectName: p.name,
+                po: p.po,
+                contractor: p.contractor || 'غير محدد',
+                classification: p.classification,
+                region: p.region,
+                subProgram: p.subProgram,
+                scope: p.scope,
+                segmentId: '',
+                permitNo: '',
+                name: fName || `خط متبقي ${fIdx + 1}`,
+                lengthMeters: Math.round((metric.redNoSegmentMeters || 0) / (metric.redNoSegmentFeatures?.length || 1)),
+                lengthKm: Number(((metric.redNoSegmentMeters || 0) / (metric.redNoSegmentFeatures?.length || 1) / 1000).toFixed(3)),
+                streetName: p.name,
+                projectObj: p
+              });
+            });
+          }
+        }
+
         metric.permitsList.forEach(pNo => {
           const cleanP = cleanPermitNo(pNo);
           if (isValidIdentifier(cleanP)) {
@@ -629,7 +765,10 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
         permitCount: breakdownMap.remaining.permitSet.size,
         segmentCount: breakdownMap.remaining.segmentTotalCount > 0 ? breakdownMap.remaining.segmentTotalCount : breakdownMap.remaining.segmentSet.size,
         uniqueSegmentCount: breakdownMap.remaining.segmentSet.size,
-        projectsCount: breakdownMap.remaining.projectSet.size
+        projectsCount: breakdownMap.remaining.projectSet.size,
+        redNoSegmentCount: breakdownMap.remaining.redNoSegmentCount,
+        redNoSegmentMeters: breakdownMap.remaining.redNoSegmentMeters,
+        redNoSegmentKm: Number(((breakdownMap.remaining.redNoSegmentMeters || 0) / 1000).toFixed(3))
       },
       cancelled: {
         category: 'cancelled',
@@ -653,6 +792,7 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
       totalSegmentsCount: globalSegmentTotalCount > 0 ? globalSegmentTotalCount : globalSegmentSet.size,
       uniqueSegmentsCount: globalSegmentSet.size,
       yellowNoPermitItems: collectedYellowNoPermitItems,
+      redNoSegmentItems: collectedRedNoSegmentItems,
       statusBreakdown: statusBreakdownFinal
     };
   };
@@ -1895,6 +2035,27 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
                 </span>
               </div>
             </div>
+
+            {/* Red Lines without Segment ID Alert Button */}
+            {activeStats.redNoSegmentItems && activeStats.redNoSegmentItems.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRedModalItems(activeStats.redNoSegmentItems);
+                  setRedModalProjectScope('جميع المشاريع');
+                  setIsRedNoSegmentModalOpen(true);
+                }}
+                className="w-full p-2.5 bg-rose-600/90 hover:bg-rose-700 text-white rounded-xl text-xs font-black flex items-center justify-between shadow-md shadow-rose-950/30 transition-all cursor-pointer border border-rose-400/40"
+              >
+                <div className="flex items-center gap-1.5">
+                  <AlertOctagon className="w-4 h-4 text-white animate-pulse" />
+                  <span>{activeStats.redNoSegmentItems.length} خط أحمر (#a52714) بدون Segment ID</span>
+                </div>
+                <span className="text-[10px] bg-rose-900/80 px-2 py-0.5 rounded-md">
+                  معاينة وتصدير 📋
+                </span>
+              </button>
+            )}
           </div>
 
           {/* Executed Water Card (منفذ - شبكات مياه) */}
@@ -2803,6 +2964,18 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
         }}
         items={selectedYellowModalItems !== null ? selectedYellowModalItems : (activeStats.yellowNoPermitItems || [])}
         categoryTitle={yellowModalProjectScope || 'جميع المشاريع'}
+        onOpenMyMaps={onOpenMyMaps}
+      />
+
+      {/* Red Items Without Segment ID Modal */}
+      <RedNoSegmentModal
+        isOpen={isRedNoSegmentModalOpen}
+        onClose={() => {
+          setIsRedNoSegmentModalOpen(false);
+          setSelectedRedModalItems(null);
+        }}
+        items={selectedRedModalItems !== null ? selectedRedModalItems : (activeStats.redNoSegmentItems || [])}
+        categoryTitle={redModalProjectScope || 'جميع المشاريع'}
         onOpenMyMaps={onOpenMyMaps}
       />
     </div>

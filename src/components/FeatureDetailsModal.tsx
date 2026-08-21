@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { cleanStage, cleanPermitNo, isYellowItemWithoutPermit } from '../utils/myMapsKmlParser';
+import { cleanStage, cleanPermitNo, cleanSegmentId, isYellowItemWithoutPermit, isRedItemWithoutSegmentId } from '../utils/myMapsKmlParser';
 import { useLanguage } from '../utils/i18n';
 import { 
   X, 
@@ -276,9 +276,20 @@ export const FeatureDetailsModal: React.FC<FeatureDetailsModalProps> = ({ featur
               </div>
 
               {/* رقم القطاع / SEGMENTID */}
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/80">
+              <div className={`p-3 rounded-xl border ${isRedItemWithoutSegmentId(feature) ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/80'}`}>
                 <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{t('feature.segmentId', 'رقم القطاع (SEGMENTID)')}</div>
-                <div className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-0.5">{feature.segmentId || '-'}</div>
+                <div className="text-xs font-bold mt-0.5">
+                  {cleanSegmentId(feature.segmentId) ? (
+                    <span className="text-blue-600 dark:text-blue-400 font-mono text-sm">{cleanSegmentId(feature.segmentId)}</span>
+                  ) : isRedItemWithoutSegmentId(feature) ? (
+                    <span className="text-rose-700 dark:text-rose-300 font-extrabold flex items-center gap-1.5 leading-relaxed">
+                      <AlertTriangle className="w-4 h-4 inline shrink-0 text-rose-600 animate-bounce" />
+                      {t('feature.noSegmentAlert', '🚨 خط متبقي (#a52714) ولا يوجد Segment ID (يحتوي على فراغ أو - فقط)')}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 font-mono">-</span>
+                  )}
+                </div>
               </div>
 
               {/* رقم التصريح / الفسح PERMITNO */}

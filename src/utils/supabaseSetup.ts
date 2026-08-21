@@ -5,7 +5,7 @@
 
 import { HistoricalReport, ProjectChangelogRecord, KMLAnalysisResult, ProjectDiffResult } from '../types';
 import { getSharedDbClient } from '../db';
-import { isValidIdentifier, cleanPermitNo, cleanSegmentId, isYellowItemWithoutPermit } from './myMapsKmlParser';
+import { isValidIdentifier, cleanPermitNo, cleanSegmentId, isYellowItemWithoutPermit, isRedItemWithoutSegmentId } from './myMapsKmlParser';
 
 export function getDatabaseClient(): any {
   return getSharedDbClient();
@@ -151,6 +151,19 @@ function mapRowToHistoricalReport(row: any): HistoricalReport {
     ? yellowItems.map((it: any) => it.segmentId || it.name).filter(Boolean)
     : (colorBreakdown?.ongoing?.yellowNoPermitSegments || (colorBreakdown as any)?.yellowNoPermitStats?.segments || []);
 
+  // Reconstruct red items without Segment ID stats (#a52714)
+  const redItems = sanitizedItems.filter(it => isRedItemWithoutSegmentId(it));
+  const redNoSegmentCount = redItems.length > 0
+    ? redItems.length
+    : Number(colorBreakdown?.remaining?.redNoSegmentCount || colorBreakdown?.redNoSegmentCount || (colorBreakdown as any)?.redNoSegmentStats?.count || row.red_no_segment_count || 0);
+  const redNoSegmentMeters = redItems.length > 0
+    ? redItems.reduce((sum: number, it: any) => sum + (it.lengthMeters || 0), 0)
+    : Number(colorBreakdown?.remaining?.redNoSegmentMeters || colorBreakdown?.redNoSegmentMeters || (colorBreakdown as any)?.redNoSegmentStats?.lengthMeters || row.red_no_segment_meters || 0);
+  const redNoSegmentKm = Number((redNoSegmentMeters / 1000).toFixed(3));
+  const redNoSegmentFeatures = redItems.length > 0
+    ? redItems.map((it: any) => it.name || it.id).filter(Boolean)
+    : (colorBreakdown?.remaining?.redNoSegmentFeatures || (colorBreakdown as any)?.redNoSegmentStats?.features || []);
+
   const enrichedColorBreakdown = {
     ...colorBreakdown,
     ongoing: {
@@ -159,6 +172,13 @@ function mapRowToHistoricalReport(row: any): HistoricalReport {
       yellowNoPermitMeters,
       yellowNoPermitKm,
       yellowNoPermitSegments
+    },
+    remaining: {
+      ...(colorBreakdown.remaining || {}),
+      redNoSegmentCount,
+      redNoSegmentMeters,
+      redNoSegmentKm,
+      redNoSegmentFeatures
     },
     permitNosByStatus: cleanedPermitNosByStatus,
     segmentIdsByStatus: cleanedSegmentIdsByStatus
@@ -184,6 +204,12 @@ function mapRowToHistoricalReport(row: any): HistoricalReport {
         lengthMeters: yellowNoPermitMeters,
         lengthKm: yellowNoPermitKm,
         segments: yellowNoPermitSegments
+      },
+      redNoSegmentStats: {
+        count: redNoSegmentCount,
+        lengthMeters: redNoSegmentMeters,
+        lengthKm: redNoSegmentKm,
+        features: redNoSegmentFeatures
       },
       permitNosByStatus: cleanedPermitNosByStatus,
       segmentIdsByStatus: cleanedSegmentIdsByStatus,

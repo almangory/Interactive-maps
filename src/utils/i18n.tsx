@@ -180,6 +180,9 @@ export const translations: TranslationsDictionary = {
   'status.yellowNoPermit': { ar: 'قطاعات جارية بدون فسح 🚨', en: 'Ongoing Without Excavation Permit 🚨' },
   'status.yellowNoPermitWarning': { ar: 'تنبيه قرمزي - تدقيق تصاريح الحفر', en: 'Crimson Alert - Excavation Permits Audit' },
   'status.yellowNoPermitDesc': { ar: 'تم اكتشاف خطوط باللون الأصفر (#ffea00 - جاري) بدون رقم فسح مسجل!', en: 'Detected yellow lines (#ffea00 - Ongoing) with no excavation permit registered!' },
+  'status.redNoSegment': { ar: 'قطاعات متبقية بدون Segment ID 🚨', en: 'Remaining Without Segment ID 🚨' },
+  'status.redNoSegmentWarning': { ar: 'تنبيه تدقيق Segment ID - أعمال متبقية', en: 'Segment ID Audit Alert - Remaining Works' },
+  'status.redNoSegmentDesc': { ar: 'تم اكتشاف خطوط باللون الأحمر (#a52714) بدون معرّف قطاع (Segment ID) أو بقيمة فارغة/شرطة (-)!', en: 'Detected red lines (#a52714) with missing Segment ID or dash-only value!' },
   'status.viewOnInteractiveMap': { ar: 'عكس على الخريطة التفاعلية 🗺️', en: 'Reflect on Interactive Map 🗺️' },
 
   // Project List & Tables Additions

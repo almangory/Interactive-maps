@@ -5,7 +5,7 @@
 
 import { KMLAnalysisResult, Project, HistoricalReport } from '../types';
 import { getDatabaseClient, findReportForProject, isReportMatchingProject } from './reportsStore';
-import { isValidIdentifier, isYellowItemWithoutPermit, cleanSegmentId, cleanPermitNo } from './myMapsKmlParser';
+import { isValidIdentifier, isYellowItemWithoutPermit, isRedItemWithoutSegmentId, cleanSegmentId, cleanPermitNo } from './myMapsKmlParser';
 
 export interface DashboardProjectMetric {
   projectId: number;
@@ -26,6 +26,10 @@ export interface DashboardProjectMetric {
   yellowNoPermitMeters?: number;
   yellowNoPermitKm?: number;
   yellowNoPermitSegments?: string[];
+  redNoSegmentCount?: number;
+  redNoSegmentMeters?: number;
+  redNoSegmentKm?: number;
+  redNoSegmentFeatures?: string[];
   updatedAt: string;
 }
 
@@ -99,6 +103,10 @@ export function computeMetricFromAnalysis(
   let yellowNoPermitMeters = 0;
   const yellowNoPermitSegments: string[] = [];
 
+  let redNoSegmentCount = 0;
+  let redNoSegmentMeters = 0;
+  const redNoSegmentFeatures: string[] = [];
+
   if (analysis.items && Array.isArray(analysis.items) && analysis.items.length > 0) {
     analysis.items.forEach(item => {
       if (isYellowItemWithoutPermit(item)) {
@@ -111,6 +119,12 @@ export function computeMetricFromAnalysis(
         } else {
           yellowNoPermitSegments.push(item.name || `قطاع جاري ${yellowNoPermitCount}`);
         }
+      }
+
+      if (isRedItemWithoutSegmentId(item)) {
+        redNoSegmentCount++;
+        redNoSegmentMeters += (item.lengthMeters || (item as any)['length_meters'] || (item as any)['length'] || 0);
+        redNoSegmentFeatures.push(item.name || (item as any)['id'] || `قطاع متبقي ${redNoSegmentCount}`);
       }
 
       const pNo = item.permitNo || (item as any)['permitNo'] || (item as any)['Permit No'] || (item as any)['permit_no'];
@@ -162,6 +176,25 @@ export function computeMetricFromAnalysis(
     }
   }
 
+  // Fallback to extract redNoSegment metrics if items array is absent
+  if (redNoSegmentCount === 0) {
+    const cbRemaining = cb.remaining || (cb as any)['remaining'];
+    const rnStats = analysis.redNoSegmentStats || cbRemaining?.redNoSegmentStats;
+    if (rnStats && rnStats.count > 0) {
+      redNoSegmentCount = rnStats.count;
+      redNoSegmentMeters = rnStats.lengthMeters || 0;
+      if (Array.isArray(rnStats.features)) {
+        redNoSegmentFeatures.push(...rnStats.features);
+      }
+    } else if (cbRemaining && cbRemaining.redNoSegmentCount > 0) {
+      redNoSegmentCount = cbRemaining.redNoSegmentCount;
+      redNoSegmentMeters = cbRemaining.redNoSegmentMeters || 0;
+      if (Array.isArray(cbRemaining.redNoSegmentFeatures)) {
+        redNoSegmentFeatures.push(...cbRemaining.redNoSegmentFeatures);
+      }
+    }
+  }
+
   const sIdsByStatus = cb.segmentIdsByStatus || analysis.segmentIdsByStatus;
   if (sIdsByStatus && typeof sIdsByStatus === 'object') {
     Object.values(sIdsByStatus).forEach((arr: any) => {
@@ -199,6 +232,10 @@ export function computeMetricFromAnalysis(
     yellowNoPermitMeters,
     yellowNoPermitKm: Number((yellowNoPermitMeters / 1000).toFixed(3)),
     yellowNoPermitSegments,
+    redNoSegmentCount,
+    redNoSegmentMeters,
+    redNoSegmentKm: Number((redNoSegmentMeters / 1000).toFixed(3)),
+    redNoSegmentFeatures,
     updatedAt: new Date().toISOString()
   };
 }
@@ -228,6 +265,7 @@ export const DashboardMetricsStore = {
             const cleanSegments: string[] = Array.from(new Set(rawSegments.map((s: any) => cleanSegmentId(s)).filter(isValidIdentifier)));
             const rawYellowSegments = Array.isArray(row.yellow_no_permit_segments) ? row.yellow_no_permit_segments : [];
             const cleanYellowSegments: string[] = rawYellowSegments.map((s: any) => cleanSegmentId(s)).filter(isValidIdentifier);
+            const rawRedFeatures = Array.isArray(row.red_no_segment_features) ? row.red_no_segment_features : (Array.isArray(row.redNoSegmentFeatures) ? row.redNoSegmentFeatures : []);
 
             const metric: DashboardProjectMetric = {
               projectId: Number(row.project_id),
@@ -248,6 +286,10 @@ export const DashboardMetricsStore = {
               yellowNoPermitMeters: Number(row.yellow_no_permit_meters || 0),
               yellowNoPermitKm: Number(row.yellow_no_permit_km || (row.yellow_no_permit_meters ? (Number(row.yellow_no_permit_meters) / 1000).toFixed(3) : 0)),
               yellowNoPermitSegments: cleanYellowSegments,
+              redNoSegmentCount: Number(row.red_no_segment_count || row.redNoSegmentCount || 0),
+              redNoSegmentMeters: Number(row.red_no_segment_meters || row.redNoSegmentMeters || 0),
+              redNoSegmentKm: Number(row.red_no_segment_km || row.redNoSegmentKm || (row.red_no_segment_meters ? (Number(row.red_no_segment_meters) / 1000).toFixed(3) : 0)),
+              redNoSegmentFeatures: rawRedFeatures,
               updatedAt: row.updated_at || new Date().toISOString()
             };
             map.set(metric.projectId, metric);
@@ -299,6 +341,10 @@ export const DashboardMetricsStore = {
           yellow_no_permit_meters: metric.yellowNoPermitMeters || 0,
           yellow_no_permit_km: metric.yellowNoPermitKm || 0,
           yellow_no_permit_segments: metric.yellowNoPermitSegments || [],
+          red_no_segment_count: metric.redNoSegmentCount || 0,
+          red_no_segment_meters: metric.redNoSegmentMeters || 0,
+          red_no_segment_km: metric.redNoSegmentKm || 0,
+          red_no_segment_features: metric.redNoSegmentFeatures || [],
           updated_at: new Date().toISOString()
         };
 
@@ -374,6 +420,10 @@ export const DashboardMetricsStore = {
           yellowNoPermitMeters: 0,
           yellowNoPermitKm: 0,
           yellowNoPermitSegments: [],
+          redNoSegmentCount: 0,
+          redNoSegmentMeters: 0,
+          redNoSegmentKm: 0,
+          redNoSegmentFeatures: [],
           updatedAt: new Date().toISOString()
         };
         updatedMap.set(pId, emptyMetric);
@@ -406,6 +456,10 @@ export const DashboardMetricsStore = {
           yellow_no_permit_meters: metric.yellowNoPermitMeters || 0,
           yellow_no_permit_km: metric.yellowNoPermitKm || 0,
           yellow_no_permit_segments: metric.yellowNoPermitSegments || [],
+          red_no_segment_count: metric.redNoSegmentCount || 0,
+          red_no_segment_meters: metric.redNoSegmentMeters || 0,
+          red_no_segment_km: metric.redNoSegmentKm || 0,
+          red_no_segment_features: metric.redNoSegmentFeatures || [],
           updated_at: metric.updatedAt || new Date().toISOString()
         }));
 

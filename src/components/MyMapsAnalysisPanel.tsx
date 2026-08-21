@@ -16,11 +16,13 @@ import {
   isValidIdentifier,
   cleanSegmentId,
   cleanPermitNo,
-  isYellowItemWithoutPermit
+  isYellowItemWithoutPermit,
+  isRedItemWithoutSegmentId
 } from '../utils/myMapsKmlParser';
 import { compareKMLAnalyses } from '../utils/diffEngine';
 import { ReportHistoryStore, getDatabaseClient } from '../utils/reportsStore';
 import { ProjectDiffModal } from './ProjectDiffModal';
+import { RedNoSegmentModal, RedNoSegmentItemDetail } from './RedNoSegmentModal';
 import { 
   runSequentialDailyAutoAnalysis, 
   stopDailyAutoAnalysis,
@@ -48,6 +50,8 @@ import {
   CheckCircle2, 
   Clock, 
   AlertTriangle, 
+  AlertOctagon,
+  Eye,
   XCircle, 
   Copy, 
   ExternalLink, 
@@ -104,6 +108,10 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
   const [regionsMapModalFocusId, setRegionsMapModalFocusId] = useState<string>('');
   const [regionsMapModalStatusFilter, setRegionsMapModalStatusFilter] = useState<string>('');
 
+  // Red Items Without Segment ID Modal State
+  const [isRedNoSegmentModalOpen, setIsRedNoSegmentModalOpen] = useState<boolean>(false);
+  const [redNoSegmentModalItems, setRedNoSegmentModalItems] = useState<RedNoSegmentItemDetail[]>([]);
+
   const handleOpenRegionsMapModal = (mode: 'segment' | 'permit', focusId: string = '', statusFilter: string = '') => {
     setRegionsMapModalMode(mode);
     setRegionsMapModalFocusId(focusId);
@@ -117,6 +125,21 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
       return { count: 0, lengthMeters: 0, lengthKm: 0, items: [] };
     }
     const items = analysisResult.items.filter(it => isYellowItemWithoutPermit(it));
+    const lengthMeters = items.reduce((sum, it) => sum + (it.lengthMeters || 0), 0);
+    return {
+      count: items.length,
+      lengthMeters,
+      lengthKm: Number((lengthMeters / 1000).toFixed(3)),
+      items
+    };
+  }, [analysisResult]);
+
+  // Compute red items (#a52714) without Segment ID stats
+  const redNoSegmentStats = React.useMemo(() => {
+    if (!analysisResult || !analysisResult.items) {
+      return { count: 0, lengthMeters: 0, lengthKm: 0, items: [] };
+    }
+    const items = analysisResult.items.filter(it => isRedItemWithoutSegmentId(it));
     const lengthMeters = items.reduce((sum, it) => sum + (it.lengthMeters || 0), 0);
     return {
       count: items.length,
@@ -1292,6 +1315,71 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                   <Globe className="h-4 w-4 text-rose-100" />
                   <span>عكس على الخريطة التفاعلية 🗺️</span>
                 </button>
+              </div>
+            )}
+
+            {/* Red Alert Card: Red Remaining Items Lacking Segment ID (#a52714) */}
+            {redNoSegmentStats.count > 0 && (
+              <div className="p-4 rounded-2xl border-2 border-rose-600 bg-gradient-to-r from-rose-50 via-red-100/70 to-orange-50 dark:from-rose-950/80 dark:via-red-900/60 dark:to-slate-900 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in duration-300">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[#a52714] text-white flex items-center justify-center shrink-0 shadow-lg shadow-rose-900/30 animate-pulse mt-0.5">
+                    <AlertOctagon className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-0.5 bg-[#a52714] text-white text-[11px] font-black rounded-full shadow-xs">
+                        تنبيه تدقيق معرّفات القطاعات (Segment ID) 🚨
+                      </span>
+                      <span className="text-xs font-bold text-rose-900 dark:text-rose-200">
+                        تم اكتشاف خطوط باللون الأحمر (#a52714 - أعمال متبقية) بدون Segment ID أو بقيمة فارغة/شرطة (-)!
+                      </span>
+                    </div>
+                    <p className="text-xs text-rose-800 dark:text-rose-300 font-semibold leading-relaxed">
+                      عدد العناصر بدون Segment ID: <strong className="font-mono text-sm text-rose-950 dark:text-white font-black underline">{redNoSegmentStats.count} قطعة</strong> | إجمالي طولها: <strong className="font-mono text-sm text-rose-950 dark:text-white font-black">{redNoSegmentStats.lengthKm} كم</strong> ({redNoSegmentStats.lengthMeters.toLocaleString('ar-SA')} متر)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const mapped: RedNoSegmentItemDetail[] = redNoSegmentStats.items.map(it => ({
+                        id: it.id,
+                        projectId: activeProject?.id || 999,
+                        projectName: activeProject?.name || 'تحليل الخريطة',
+                        po: activeProject?.po,
+                        contractor: it.contractor || activeProject?.contractor,
+                        classification: activeProject?.classification,
+                        region: activeProject?.region,
+                        subProgram: activeProject?.subProgram,
+                        scope: it.statusCategory === 'executed_water' ? 'مياه' : 'صرف صحي',
+                        segmentId: it.segmentId,
+                        permitNo: it.permitNo,
+                        name: it.name,
+                        lengthMeters: it.lengthMeters,
+                        lengthKm: it.lengthKm,
+                        streetName: it.streetName,
+                        district: it.district,
+                        innerDiameter: it.innerDiameter,
+                        zone: it.zone,
+                        drillingType: it.drillingType,
+                        centerLat: it.centerLat,
+                        centerLng: it.centerLng,
+                        googleMapsUrl: it.googleMapsUrl,
+                        coordinates: it.coordinates,
+                        featureItem: it,
+                        projectObj: activeProject || undefined
+                      }));
+                      setRedNoSegmentModalItems(mapped);
+                      setIsRedNoSegmentModalOpen(true);
+                    }}
+                    className="px-4 py-2.5 bg-[#a52714] hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-lg shadow-rose-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 border border-rose-400/30"
+                  >
+                    <Eye className="h-4 w-4 text-rose-100" />
+                    <span>معاينة وتصدير الخطوط الحمراء ({redNoSegmentStats.count}) 📋</span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -2603,6 +2691,22 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
         initialFocusId={regionsMapModalFocusId}
         initialStatusFilter={regionsMapModalStatusFilter}
         projectName={activeProject?.name}
+      />
+
+      {/* Red Features Without Segment ID Modal */}
+      <RedNoSegmentModal
+        isOpen={isRedNoSegmentModalOpen}
+        onClose={() => setIsRedNoSegmentModalOpen(false)}
+        items={redNoSegmentModalItems}
+        categoryTitle={activeProject?.name || 'فحص القطاعات الحمراء'}
+        onOpenMyMaps={(proj) => {
+          setIsRedNoSegmentModalOpen(false);
+          setActiveProject(proj);
+          if (proj.mapUrl) {
+            setMapInputUrl(proj.mapUrl);
+            loadAnalysis(proj.mapUrl, proj.name);
+          }
+        }}
       />
     </div>
   );

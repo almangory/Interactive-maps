@@ -962,6 +962,39 @@ export function isYellowItemWithoutPermit(item: KMLFeatureItem | any): boolean {
 }
 
 /**
+ * Checks if a KML feature item has the red color (#a52714 / remaining status) AND lacks a valid Segment ID.
+ * As per requirements: empty strings, spaces only, '-' or '--' only do NOT qualify as a valid Segment ID.
+ */
+export function isRedItemWithoutSegmentId(item: KMLFeatureItem | any): boolean {
+  if (!item || typeof item !== 'object') return false;
+
+  // 1. Check if color or status category is red (#a52714 / remaining)
+  const color = (item.colorHex || item.color_hex || item.color || item.hex || '').toLowerCase().trim();
+  const statusCat = (item.statusCategory || item.status_category || '').toLowerCase().trim();
+  const statusLbl = (item.statusLabel || item.status_label || item.label || '').toLowerCase().trim();
+
+  const isRed = color === '#a52714' || color === '#d93025' || color === '#c5221f' ||
+                color === '#ea4335' || color === '#e53935' || color === '#ef4444' ||
+                color === '#dc2626' || color === '#b71c1c' || color.includes('red') ||
+                statusCat === 'remaining' || statusCat === 'متبقي' || statusCat === 'أعمال متبقية' ||
+                statusLbl.includes('متبقي') || statusLbl.includes('remaining');
+
+  if (!isRed) return false;
+
+  // 2. Check if segmentId is missing, empty, only dashes/spaces, or invalid placeholder
+  const rawSeg = item.segmentId !== undefined ? item.segmentId : (item.segment_id !== undefined ? item.segment_id : (item as any)['Segment ID']);
+  if (rawSeg === null || rawSeg === undefined) return true;
+
+  const str = String(rawSeg).trim();
+  if (!str || str === '-' || /^[-–—_#/\\:;.\s]+$/.test(str)) return true;
+
+  const cleanSeg = cleanSegmentId(rawSeg);
+  const hasNoSegmentId = !cleanSeg || !isValidIdentifier(cleanSeg);
+
+  return hasNoSegmentId;
+}
+
+/**
  * Parse KML XML string into analytical dataset
  */
 export function parseKMLContent(xmlString: string, projectName: string = 'مشروع الخارطة التفاعلية', mapUrl: string = '', projectScope?: string): KMLAnalysisResult {
@@ -1493,6 +1526,16 @@ function generateFinalAnalysisResult(
   colorBreakdown.ongoing.yellowNoPermitKm = yellowNoPermitKm;
   colorBreakdown.ongoing.yellowNoPermitSegments = yellowNoPermitSegments;
 
+  const redNoSegmentItems = items.filter(isRedItemWithoutSegmentId);
+  const redNoSegmentMeters = redNoSegmentItems.reduce((sum, it) => sum + (it.lengthMeters || 0), 0);
+  const redNoSegmentKm = Number((redNoSegmentMeters / 1000).toFixed(3));
+  const redNoSegmentFeatures = redNoSegmentItems.map(it => it.name || it.id).filter(Boolean);
+
+  colorBreakdown.remaining.redNoSegmentCount = redNoSegmentItems.length;
+  colorBreakdown.remaining.redNoSegmentMeters = redNoSegmentMeters;
+  colorBreakdown.remaining.redNoSegmentKm = redNoSegmentKm;
+  colorBreakdown.remaining.redNoSegmentFeatures = redNoSegmentFeatures;
+
   return {
     projectName,
     projectScope,
@@ -1506,6 +1549,12 @@ function generateFinalAnalysisResult(
       lengthMeters: yellowNoPermitMeters,
       lengthKm: yellowNoPermitKm,
       segments: yellowNoPermitSegments
+    },
+    redNoSegmentStats: {
+      count: redNoSegmentItems.length,
+      lengthMeters: redNoSegmentMeters,
+      lengthKm: redNoSegmentKm,
+      features: redNoSegmentFeatures
     },
     segmentIdsByStatus: {
       executedWater: Array.from(segmentSetMap.executed_water),
