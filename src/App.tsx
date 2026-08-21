@@ -551,22 +551,16 @@ export default function App() {
         setProjects(prev => (prev && prev.length > 0 ? prev : initial));
       }
 
-      // لا يتم جلب جدول المستخدمين إلا إذا كان المستخدم الحالي مديراً للنظام لضمان الخصوصية والأمان التام
-      if (activeUser && activeUser.role === 'admin') {
+      // جلب وتحديث الصلاحيات للمستخدم النشط والمدير مباشرة وحياً من قاعدة البيانات
+      if (activeUser && activeUser.id && activeUser.id !== 'guest') {
         const { data: dbUsers, error: userError } = await db
           .from('users')
           .select('*');
 
         if (userError) {
           console.warn("فشل جلب المستخدمين:", userError.message);
-        } else if (dbUsers) {
-          const cachedUsersFromStorage = (() => {
-            try { return JSON.parse(localStorage.getItem('water_maps_cached_users') || '[]'); } catch (e) { return []; }
-          })();
-
+        } else if (dbUsers && dbUsers.length > 0) {
           const mappedUsers = dbUsers.map((u: any) => {
-            const existingLocal = users.find(existing => existing.id === u.id) || cachedUsersFromStorage.find((existing: any) => existing.id === u.id);
-
             let allowedRegions: string[] = ['الكل'];
             if (u.allowed_regions) {
               if (Array.isArray(u.allowed_regions)) { allowedRegions = u.allowed_regions; } 
@@ -578,25 +572,25 @@ export default function App() {
               else { try { allowedScopes = JSON.parse(u.allowed_scopes); } catch (e) { allowedScopes = [u.allowed_scopes]; } }
             }
 
-            let allowedTabs = existingLocal?.allowedTabs || ['maps', 'stats', 'layers'];
+            let allowedTabs = ['maps', 'stats', 'layers'];
             if (u.allowed_tabs !== undefined && u.allowed_tabs !== null) {
               if (Array.isArray(u.allowed_tabs)) { allowedTabs = u.allowed_tabs; } 
               else { try { allowedTabs = JSON.parse(u.allowed_tabs); } catch (e) { } }
             }
 
-            let allowedLayers: string[] = existingLocal?.allowedLayers || ['water', 'sewage', 'materials'];
+            let allowedLayers: string[] = ['water', 'sewage', 'materials'];
             if (u.allowed_layers !== undefined && u.allowed_layers !== null) {
               if (Array.isArray(u.allowed_layers)) { allowedLayers = u.allowed_layers; } 
               else { try { allowedLayers = JSON.parse(u.allowed_layers); } catch (e) { allowedLayers = [u.allowed_layers]; } }
             }
 
-            let allowedStatsSubTabs: string[] = existingLocal?.allowedStatsSubTabs || ['lengths', 'mymaps', 'general'];
+            let allowedStatsSubTabs: string[] = ['lengths', 'mymaps', 'general'];
             if (u.allowed_stats_sub_tabs !== undefined && u.allowed_stats_sub_tabs !== null) {
               if (Array.isArray(u.allowed_stats_sub_tabs)) { allowedStatsSubTabs = u.allowed_stats_sub_tabs; }
               else { try { allowedStatsSubTabs = JSON.parse(u.allowed_stats_sub_tabs); } catch (e) { } }
             }
 
-            let allowedProjectIds: number[] = existingLocal?.allowedProjectIds || [];
+            let allowedProjectIds: number[] = [];
             if (u.allowed_project_ids !== undefined && u.allowed_project_ids !== null) {
               if (Array.isArray(u.allowed_project_ids)) { allowedProjectIds = u.allowed_project_ids.map(Number); } 
               else { try { allowedProjectIds = JSON.parse(u.allowed_project_ids).map(Number); } catch (e) { } }
@@ -619,17 +613,11 @@ export default function App() {
               allowedTabs: allowedTabs,
               allowedLayers: allowedLayers,
               allowedStatsSubTabs: allowedStatsSubTabs,
-              canOpenExternalLinks: u.can_open_external_links !== undefined && u.can_open_external_links !== null
-                ? u.can_open_external_links !== false
-                : (existingLocal?.canOpenExternalLinks !== false),
-              canFilter: u.can_filter !== undefined && u.can_filter !== null
-                ? u.can_filter !== false
-                : (existingLocal?.canFilter !== false),
-              canInsert: u.can_insert !== undefined && u.can_insert !== null
-                ? u.can_insert !== false
-                : (existingLocal?.canInsert !== false),
-              department: u.department || existingLocal?.department || '',
-              jobTitle: u.job_title || existingLocal?.jobTitle || '',
+              canOpenExternalLinks: u.can_open_external_links !== false,
+              canFilter: u.can_filter !== false,
+              canInsert: u.can_insert !== false,
+              department: u.department || '',
+              jobTitle: u.job_title || '',
               allowedProjectIds: allowedProjectIds,
               allowedStatuses: allowedStatuses
             };
@@ -637,17 +625,19 @@ export default function App() {
 
           // 🛡️ Strip sensitive password fields before caching in localStorage
           const safeUsersForStorage = mappedUsers.map(({ password, ...rest }) => ({ ...rest, password: '' }));
-          setUsers(safeUsersForStorage);
-          localStorage.setItem('water_maps_cached_users', JSON.stringify(safeUsersForStorage));
+          if (activeUser.role === 'admin') {
+            setUsers(safeUsersForStorage);
+            localStorage.setItem('water_maps_cached_users', JSON.stringify(safeUsersForStorage));
+          }
 
-          const savedAndActive = localStorage.getItem('water_maps_active_user_id');
-          if (savedAndActive) {
-            const found = safeUsersForStorage.find(u => u.id === savedAndActive);
-            if (found) setCurrentUser(found);
+          // 🔗 Sync active currentUser state with the latest live permissions from database
+          const myProfile = mappedUsers.find(u => u.id === activeUser.id || (u.username && u.username.toLowerCase() === (activeUser.username || '').toLowerCase()));
+          if (myProfile) {
+            setCurrentUser(myProfile);
+            const { password: _p, ...safeProfile } = myProfile;
+            localStorage.setItem('water_maps_cached_users', JSON.stringify([safeProfile]));
           }
         }
-      } else {
-        setUsers([]);
       }
     } catch (err) {
       console.warn(err);
