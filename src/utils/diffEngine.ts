@@ -227,44 +227,72 @@ export function compareKMLAnalyses(
   // Check Stage property on yellow lines (ongoing status category)
   const yellowLineStageChanges: YellowLineStageChange[] = [];
 
-  const oldOngoingItemsMap = new Map<string, { stage: string; item: any }>();
-  (oldResult.items || [])
-    .filter((it) => it.statusCategory === 'ongoing' || it.colorHex?.toLowerCase() === '#ffea00')
-    .forEach((it) => {
-      const key = it.segmentId || it.name || it.id;
-      oldOngoingItemsMap.set(key, { stage: cleanStage(it.stage), item: it });
-    });
+  const oldOngoingList = (oldResult.items || []).filter(
+    (it) => it.statusCategory === 'ongoing' || it.colorHex?.toLowerCase() === '#ffea00'
+  );
 
   (newResult.items || [])
     .filter((it) => it.statusCategory === 'ongoing' || it.colorHex?.toLowerCase() === '#ffea00')
     .forEach((newItem) => {
-      const key = newItem.segmentId || newItem.name || newItem.id;
-      const oldData = oldOngoingItemsMap.get(key);
+      // Find matching old item by:
+      // 1. segmentId (if valid)
+      // 2. permitNo (if unique and valid)
+      // 3. Exact feature name
+      // 4. Close coordinate center (within ~30 meters)
+      // 5. id
+      let matchedOldItem = oldOngoingList.find(
+        (oldIt) => isValidIdentifier(newItem.segmentId) && isValidIdentifier(oldIt.segmentId) && newItem.segmentId.trim() === oldIt.segmentId.trim()
+      );
+
+      if (!matchedOldItem && isValidIdentifier(newItem.permitNo)) {
+        matchedOldItem = oldOngoingList.find(
+          (oldIt) => isValidIdentifier(oldIt.permitNo) && cleanPermitNo(newItem.permitNo) === cleanPermitNo(oldIt.permitNo)
+        );
+      }
+
+      if (!matchedOldItem && newItem.name) {
+        matchedOldItem = oldOngoingList.find(
+          (oldIt) => oldIt.name && oldIt.name.trim() === newItem.name.trim()
+        );
+      }
+
+      if (!matchedOldItem && newItem.centerLat && newItem.centerLng) {
+        matchedOldItem = oldOngoingList.find((oldIt) => {
+          if (!oldIt.centerLat || !oldIt.centerLng) return false;
+          const dLat = Math.abs(newItem.centerLat! - oldIt.centerLat);
+          const dLng = Math.abs(newItem.centerLng! - oldIt.centerLng);
+          return dLat < 0.0003 && dLng < 0.0003;
+        });
+      }
+
+      if (!matchedOldItem && newItem.id) {
+        matchedOldItem = oldOngoingList.find((oldIt) => oldIt.id === newItem.id);
+      }
 
       const currentStage = cleanStage(newItem.stage);
 
-      if (oldData) {
-        const previousStage = cleanStage(oldData.stage);
+      if (matchedOldItem) {
+        const previousStage = cleanStage(matchedOldItem.stage);
         if (previousStage !== currentStage) {
           yellowLineStageChanges.push({
-            segmentId: newItem.segmentId,
-            featureName: newItem.name,
+            segmentId: newItem.segmentId || matchedOldItem.segmentId,
+            featureName: newItem.name || matchedOldItem.name,
             previousStage,
             newStage: currentStage,
-            permitNo: newItem.permitNo,
+            permitNo: newItem.permitNo || matchedOldItem.permitNo,
             lengthMeters: newItem.lengthMeters,
             colorHex: newItem.colorHex || '#ffea00',
-            streetName: newItem.streetName,
-            district: newItem.district,
-            innerDiameter: newItem.innerDiameter,
-            zone: newItem.zone,
-            drillingType: newItem.drillingType,
-            contractor: newItem.contractor,
-            kmlProjectName: newItem.kmlProjectName,
-            kmlProjectId: newItem.kmlProjectId,
-            centerLat: newItem.centerLat,
-            centerLng: newItem.centerLng,
-            googleMapsUrl: newItem.googleMapsUrl
+            streetName: newItem.streetName || matchedOldItem.streetName,
+            district: newItem.district || matchedOldItem.district,
+            innerDiameter: newItem.innerDiameter || matchedOldItem.innerDiameter,
+            zone: newItem.zone || matchedOldItem.zone,
+            drillingType: newItem.drillingType || matchedOldItem.drillingType,
+            contractor: newItem.contractor || matchedOldItem.contractor,
+            kmlProjectName: newItem.kmlProjectName || matchedOldItem.kmlProjectName,
+            kmlProjectId: newItem.kmlProjectId || matchedOldItem.kmlProjectId,
+            centerLat: newItem.centerLat || matchedOldItem.centerLat,
+            centerLng: newItem.centerLng || matchedOldItem.centerLng,
+            googleMapsUrl: newItem.googleMapsUrl || matchedOldItem.googleMapsUrl
           });
         }
       } else {
