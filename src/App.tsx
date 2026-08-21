@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Project, User, AppNotification } from './types';
+import { Project, User, AppNotification, ProjectDiffResult } from './types';
 import { getParsedProjects } from './data/initialProjects';
 import { INITIAL_USERS } from './data/initialUsers';
 
@@ -18,6 +18,7 @@ import { ProjectMapViewer } from './components/ProjectMapViewer';
 import { UserManagement } from './components/UserManagement';
 import { ProjectModal } from './components/ProjectModal';
 import { ProjectList } from './components/ProjectList';
+import { ProjectDiffModal } from './components/ProjectDiffModal';
 import { NWCLogo } from './components/NWCLogo';
 import { ProjectLayersViewer } from './components/ProjectLayersViewer';
 import { ChangelogTab } from './components/ChangelogTab';
@@ -419,6 +420,46 @@ export default function App() {
   const [successNotification, setSuccessNotification] = useState('');
   const [showExitModal, setShowExitModal] = useState(false);
   const [databaseError, setDatabaseError] = useState<string | null>(null);
+
+  // 🚀 Quick Analysis & Direct Diff Modal states
+  const [projectDiffResult, setProjectDiffResult] = useState<ProjectDiffResult | null>(null);
+  const [diffTargetProject, setDiffTargetProject] = useState<Project | null>(null);
+  const [isProjectDiffModalOpen, setIsProjectDiffModalOpen] = useState<boolean>(false);
+
+  const handleTriggerQuickAnalysis = async (proj: Project) => {
+    if (!proj.mapUrl) return;
+    try {
+      showNotification(`⚡ جاري الفحص المباشر لخريطة: ${proj.name}...`);
+      const { parseMyMapsKml } = await import('./utils/myMapsKmlParser');
+      const { ReportHistoryStore } = await import('./utils/reportsStore');
+      const { computeProjectDiff } = await import('./utils/diffEngine');
+
+      const analysisResult = await parseMyMapsKml(proj.mapUrl, proj.name, proj.id);
+      
+      // Get latest previous report before saving
+      const previousReport = await ReportHistoryStore.getLatestReport(proj.id, proj.name, proj.po);
+
+      // Save new report
+      const savedReport = await ReportHistoryStore.saveReport(proj.id, proj.name, proj.mapUrl, analysisResult);
+
+      if (previousReport && previousReport.analysisResult) {
+        const diff = computeProjectDiff(previousReport.analysisResult, analysisResult, proj.id, proj.name, proj.mapUrl);
+        if (diff.hasChanges || (diff.yellowLineStageChanges || []).length > 0 || (diff.addedPermits || []).length > 0 || Math.abs(diff.totalLengthDiffMeters || 0) > 0.1) {
+          await ReportHistoryStore.saveChangelog(proj.id, proj.name, savedReport.id, previousReport.id, diff);
+          setProjectDiffResult(diff);
+          setDiffTargetProject(proj);
+          setIsProjectDiffModalOpen(true);
+        } else {
+          showNotification(`✅ اكتمل الفحص: بيانات المشروع مطابقة تماماً للتقرير السابق (${analysisResult.totalLengthKm} كم)`);
+        }
+      } else {
+        showNotification(`✅ تم الفحص بنجاح وتسجيل التقرير المرجعي الأول (${analysisResult.totalLengthKm} كم)`);
+      }
+    } catch (err: any) {
+      console.error('Quick analysis error:', err);
+      showNotification(`⚠️ تعذر استكمال الفحص السريع: ${err?.message || 'خطأ في جلب بيانات الخريطة'}`);
+    }
+  };
 
   // 3.0. Offline/Online Status Monitor
   const [isOnline, setIsOnline] = useState<boolean>(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -1884,6 +1925,12 @@ export default function App() {
                       currentUser={currentUser} 
                       onToggleFavorite={handleToggleFavorite} 
                       onEditProject={canEditProjects ? handleStartEditProject : undefined} 
+                      onTriggerQuickAnalysis={handleTriggerQuickAnalysis}
+                      onOpenProjectDiff={(diff, proj) => {
+                        setProjectDiffResult(diff);
+                        setDiffTargetProject(proj);
+                        setIsProjectDiffModalOpen(true);
+                      }}
                       searchTerm={searchTerm} 
                       setSearchTerm={setSearchTerm} 
                       selectedSubProgram={selectedSubProgram} 
@@ -1997,6 +2044,18 @@ export default function App() {
       </main>
 
       <ProjectModal isOpen={isProjectModalOpen} project={editingProject} onClose={() => setIsProjectModalOpen(false)} onSave={handleSaveProject} />
+
+      {/* Direct Project Diff Modal from Quick Analysis */}
+      {diffTargetProject && (
+        <ProjectDiffModal
+          isOpen={isProjectDiffModalOpen}
+          onClose={() => setIsProjectDiffModalOpen(false)}
+          diffResult={projectDiffResult}
+          projectId={diffTargetProject.id}
+          projectName={diffTargetProject.name}
+          isAdmin={currentUser.role === 'admin'}
+        />
+      )}
 
       {showExitModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">

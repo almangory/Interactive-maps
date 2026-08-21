@@ -4,13 +4,14 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Project, User } from '../types';
-import { Search, MapPin, SlidersHorizontal, Droplet, Waves, RefreshCw, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Eye, Globe, List, LayoutGrid, Star, Pencil, MessageCircle, Phone } from 'lucide-react';
+import { Project, User, ProjectDiffResult } from '../types';
+import { Search, MapPin, SlidersHorizontal, Droplet, Waves, RefreshCw, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Eye, Globe, List, LayoutGrid, Star, Pencil, MessageCircle, Phone, Zap, FileSpreadsheet, Sparkles } from 'lucide-react';
 import { getProjectCoordinates } from './ProjectMapViewer';
 import { getEmbeddableMapUrl } from '../data/initialProjects';
 import { VoiceSearchButton } from './VoiceSearchButton';
 import { getWhatsAppLink, WhatsAppIcon } from '../utils/whatsapp';
 import { useLanguage } from '../utils/i18n';
+import { ExecutiveChangesSummaryModal } from './ExecutiveChangesSummaryModal';
 
 interface ProjectListProps {
   projects: Project[]; // All authenticated visible projects
@@ -21,6 +22,8 @@ interface ProjectListProps {
   currentUser: User;
   onToggleFavorite?: (projectId: number) => void;
   onEditProject?: (project: Project) => void;
+  onTriggerQuickAnalysis?: (project: Project) => Promise<void> | void;
+  onOpenProjectDiff?: (diff: ProjectDiffResult, project: Project) => void;
 
   searchTerm: string;
   setSearchTerm: (val: string) => void;
@@ -88,6 +91,8 @@ export function ProjectList({
   const [viewMode, setViewMode] = useState<'compact' | 'cards'>('compact');
   // Track which project has its inline My Maps viewer toggled on inside the list view
   const [showListInlineMapId, setShowListInlineMapId] = useState<number | null>(null);
+  const [isExecutiveSummaryOpen, setIsExecutiveSummaryOpen] = useState(false);
+  const [quickAnalyzingId, setQuickAnalyzingId] = useState<number | null>(null);
 
   // Filter lists derived dynamically from active accessible projects
   const uniqueSubPrograms = useMemo(() => {
@@ -148,6 +153,15 @@ export function ProjectList({
                 />
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setIsExecutiveSummaryOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-indigo-950/60 border-blue-200 dark:border-indigo-800 text-blue-800 dark:text-blue-300 hover:from-blue-100 hover:to-indigo-100 shadow-3xs"
+              title="عرض تقرير التغيرات المجمع لجميع المشاريع وتصدير Excel"
+            >
+              <FileSpreadsheet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span className="hidden md:inline">تقرير التغيرات الأسبوعي 📑</span>
+            </button>
             <button
               type="button"
               onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
@@ -500,6 +514,40 @@ export function ProjectList({
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {p.mapUrl && onTriggerQuickAnalysis && (
+                      <button
+                        type="button"
+                        disabled={quickAnalyzingId === p.id}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          setQuickAnalyzingId(p.id);
+                          try {
+                            await onTriggerQuickAnalysis(p);
+                          } finally {
+                            setQuickAnalyzingId(null);
+                          }
+                        }}
+                        className={`flex items-center gap-1 font-bold px-2.5 py-1 rounded-lg transition-all text-xs whitespace-nowrap shrink-0 cursor-pointer ${
+                          quickAnalyzingId === p.id
+                            ? 'bg-amber-100 text-amber-800 border border-amber-300 animate-pulse'
+                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-3xs'
+                        }`}
+                        title="فحص فوري للرابط واستخراج الأطوال ومقارنة التغيرات"
+                      >
+                        {quickAnalyzingId === p.id ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-amber-600 border-t-transparent rounded-full animate-spin"></div>
+                            <span>جاري الفحص...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                            <span>فحص فوري ⚡</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={(e) => {
@@ -748,6 +796,41 @@ export function ProjectList({
                     </button>
                   )}
 
+                <div className="flex items-center gap-1.5">
+                  {p.mapUrl && onTriggerQuickAnalysis && (
+                    <button
+                      type="button"
+                      disabled={quickAnalyzingId === p.id}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setQuickAnalyzingId(p.id);
+                        try {
+                          await onTriggerQuickAnalysis(p);
+                        } finally {
+                          setQuickAnalyzingId(null);
+                        }
+                      }}
+                      className={`flex items-center gap-1 font-bold px-2.5 py-1.5 rounded-lg transition-all text-[11px] whitespace-nowrap shrink-0 cursor-pointer ${
+                        quickAnalyzingId === p.id
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300 animate-pulse'
+                          : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-3xs'
+                      }`}
+                      title="فحص فوري للرابط واستخراج الأطوال ومقارنة التغيرات"
+                    >
+                      {quickAnalyzingId === p.id ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-amber-600 border-t-transparent rounded-full animate-spin"></div>
+                          <span>جاري الفحص...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                          <span>فحص فوري ⚡</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={(e) => {
@@ -846,6 +929,13 @@ export function ProjectList({
           </div>
         </div>
       )}
+      {/* Executive Multi-Project Changes Summary Modal */}
+      <ExecutiveChangesSummaryModal
+        isOpen={isExecutiveSummaryOpen}
+        onClose={() => setIsExecutiveSummaryOpen(false)}
+        projects={projects}
+        onOpenProjectDiff={onOpenProjectDiff}
+      />
     </div>
   );
 }
