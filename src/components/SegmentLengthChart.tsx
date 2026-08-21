@@ -2,8 +2,16 @@ import React, { useState, useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell
 } from 'recharts';
-import { BarChart3, Filter, ArrowUpDown, MapPin, Layers, Hash, Ruler, Search, CheckCircle2 } from 'lucide-react';
+import { 
+  Hash, 
+  Search, 
+  CheckCircle2, 
+  AlertTriangle, 
+  BarChart2, 
+  AlignLeft
+} from 'lucide-react';
 import { KMLFeatureItem } from '../types';
+import { isValidIdentifier } from '../utils/myMapsKmlParser';
 
 export interface SegmentGroupItem {
   segmentId: string;
@@ -29,6 +37,8 @@ export const SegmentLengthChart: React.FC<SegmentLengthChartProps> = ({
   const [unit, setUnit] = useState<'km' | 'm'>('km');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [chartOrientation, setChartOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
+  const [hideUnsegmented, setHideUnsegmented] = useState<boolean>(true);
 
   // Group items by Segment ID
   const segmentGroups = useMemo(() => {
@@ -42,7 +52,8 @@ export const SegmentLengthChart: React.FC<SegmentLengthChartProps> = ({
     }> = {};
 
     items.forEach(it => {
-      const sId = it.segmentId && it.segmentId.trim() ? it.segmentId.trim() : 'بدون معرف قطاع (غير محدد)';
+      const isVal = isValidIdentifier(it.segmentId);
+      const sId = isVal ? it.segmentId.trim() : 'بدون معرف قطاع (غير محدد)';
       if (!map[sId]) {
         map[sId] = {
           segmentId: sId,
@@ -60,7 +71,7 @@ export const SegmentLengthChart: React.FC<SegmentLengthChartProps> = ({
       const st = it.statusCategory || 'remaining';
       map[sId].statusCounts[st] = (map[sId].statusCounts[st] || 0) + 1;
 
-      const col = it.color || '#A52714';
+      const col = it.originalColorHex || it.colorHex || it.color || '#A52714';
       map[sId].colorCounts[col] = (map[sId].colorCounts[col] || 0) + 1;
     });
 
@@ -101,19 +112,22 @@ export const SegmentLengthChart: React.FC<SegmentLengthChartProps> = ({
       return { totalSegments: 0, totalLengthKm: '0.00', longestSegment: '-', maxLenKm: '0.00', unsegmentedCount: 0 };
     }
 
-    const totalSegments = segmentGroups.filter(s => !s.segmentId.includes('بدون معرف')).length;
+    const validSegments = segmentGroups.filter(s => !s.segmentId.includes('بدون معرف'));
+    const totalSegments = validSegments.length;
     let sumLen = 0;
     let maxLen = 0;
     let longestSegment = '-';
     let unsegmentedCount = 0;
 
     segmentGroups.forEach(s => {
-      sumLen += s.totalLengthMeters;
       if (s.segmentId.includes('بدون معرف')) {
-        unsegmentedCount = s.count;
-      } else if (s.totalLengthMeters > maxLen) {
-        maxLen = s.totalLengthMeters;
-        longestSegment = s.segmentId;
+        unsegmentedCount += s.count;
+      } else {
+        sumLen += s.totalLengthMeters;
+        if (s.totalLengthMeters > maxLen) {
+          maxLen = s.totalLengthMeters;
+          longestSegment = s.segmentId;
+        }
       }
     });
 
@@ -129,6 +143,11 @@ export const SegmentLengthChart: React.FC<SegmentLengthChartProps> = ({
   // Filter & Sort
   const chartData = useMemo(() => {
     let list = [...segmentGroups];
+
+    // Exclude unassigned segments if toggle is active (prevents scale squashing)
+    if (hideUnsegmented) {
+      list = list.filter(s => !s.segmentId.includes('بدون معرف'));
+    }
 
     if (statusFilter !== 'all') {
       list = list.filter(s => s.primaryStatus === statusFilter);
@@ -155,37 +174,50 @@ export const SegmentLengthChart: React.FC<SegmentLengthChartProps> = ({
     return list.map((s, idx) => ({
       ...s,
       rank: idx + 1,
-      displayName: s.segmentId.length > 20 ? s.segmentId.substring(0, 18) + '...' : s.segmentId,
+      displayName: s.segmentId.length > 24 ? s.segmentId.substring(0, 22) + '...' : s.segmentId,
+      fullDisplayName: s.segmentId,
       chartLength: unit === 'km' ? s.totalLengthKm : Math.round(s.totalLengthMeters)
     }));
-  }, [segmentGroups, statusFilter, searchQuery, sortBy, topLimit, unit]);
+  }, [segmentGroups, statusFilter, searchQuery, sortBy, topLimit, unit, hideUnsegmented]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-slate-900/95 border border-slate-700 text-white p-3 rounded-xl shadow-2xl backdrop-blur-md text-xs space-y-1.5 z-50 pointer-events-none min-w-[200px]">
-          <div className="flex items-center justify-between border-b border-slate-700 pb-1 font-bold text-cyan-300">
-            <span>{data.segmentId}</span>
-            <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">#{data.rank}</span>
+        <div className="bg-slate-900/95 border border-slate-700 text-white p-3.5 rounded-2xl shadow-2xl backdrop-blur-md text-xs space-y-2 z-50 pointer-events-none min-w-[220px]">
+          <div className="flex items-center justify-between border-b border-slate-700/80 pb-1.5 font-bold text-cyan-300">
+            <span className="font-mono text-sm">{data.fullDisplayName || data.segmentId}</span>
+            <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full text-slate-300 border border-slate-700">#{data.rank}</span>
           </div>
-          <div className="text-slate-300 flex justify-between">
+          <div className="text-slate-300 flex justify-between items-center">
             <span>إجمالي الطول:</span>
-            <strong className="text-blue-400 font-mono">{unit === 'km' ? `${data.totalLengthKm} كم` : `${data.totalLengthMeters.toLocaleString('ar-SA')} متر`}</strong>
+            <strong className="text-blue-400 font-mono text-sm font-black">
+              {data.totalLengthKm} كم ({data.totalLengthMeters.toLocaleString('ar-SA')} م)
+            </strong>
           </div>
-          <div className="text-slate-300 flex justify-between">
+          <div className="text-slate-300 flex justify-between items-center">
             <span>عدد القطاعات:</span>
-            <strong className="text-amber-300 font-mono">{data.count} قطعة</strong>
+            <strong className="text-amber-300 font-mono font-bold">{data.count} قطعة</strong>
           </div>
+          <p className="text-[10px] text-slate-400 pt-1 border-t border-slate-800 text-center">
+            💡 انقر على الشريط لعرض التفاصيل وتحديد الموقع بالخريطة
+          </p>
         </div>
       );
     }
     return null;
   };
 
+  const dynamicChartHeight = useMemo(() => {
+    if (chartOrientation === 'horizontal') {
+      return Math.max(340, Math.min(800, chartData.length * 38 + 60));
+    }
+    return 340;
+  }, [chartOrientation, chartData.length]);
+
   return (
     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-      {/* Header & Stats */}
+      {/* Header & KPI Summary */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
         <div>
           <h4 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -193,25 +225,36 @@ export const SegmentLengthChart: React.FC<SegmentLengthChartProps> = ({
             <span>المخطط البياني وحصر الأطوال حسب القطاعات (Segment ID)</span>
           </h4>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            توزيع وتحليل الأطوال لقطاعات العمل المستخرجة من الخريطة.
+            توزيع وتحليل أطوال قطاعات العمل المستخرجة من الخريطة بمقاييس دقيقة وواضحة.
           </p>
         </div>
 
+        {/* Quick KPI Badges & Toggle */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-xl border border-blue-200 dark:border-blue-800 flex items-center gap-1">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            <span>إجمالي السجمنت: {stats.totalSegments}</span>
+            <span>إجمالي السجمنت المعتمد: {stats.totalSegments}</span>
           </span>
           {stats.unsegmentedCount > 0 && (
-            <span className="text-xs font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 px-3 py-1 rounded-xl border border-rose-200 dark:border-rose-800 flex items-center gap-1">
-              <span>بدون معرف سجمنت: {stats.unsegmentedCount} عنصر</span>
-            </span>
+            <button
+              type="button"
+              onClick={() => setHideUnsegmented(!hideUnsegmented)}
+              className={`text-xs font-bold px-3 py-1 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer ${
+                hideUnsegmented
+                  ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-100'
+                  : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-200 border-rose-400 dark:border-rose-700 shadow-sm'
+              }`}
+              title="انقر للتبديل بين إظهار أو استبعاد العناصر بدون Segment ID من المخطط"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+              <span>بدون معرف: {stats.unsegmentedCount} ({hideUnsegmented ? 'مستبعد من الرسم' : 'معروض بالرسم'})</span>
+            </button>
           )}
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+      {/* Filter and Control Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-1">
         {/* Search */}
         <div className="relative">
           <input
@@ -238,8 +281,34 @@ export const SegmentLengthChart: React.FC<SegmentLengthChartProps> = ({
           </select>
         </div>
 
-        {/* Unit & Top Count */}
-        <div className="flex items-center gap-2">
+        {/* Chart View Layout Mode */}
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+          <button
+            type="button"
+            onClick={() => setChartOrientation('horizontal')}
+            className={`flex-1 text-[11px] font-black py-1 px-1.5 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
+              chartOrientation === 'horizontal' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+            }`}
+            title="عرض أفقي (أشرطة أفقية مريحة لقراءة الأسماء والمعرفات الطويلة)"
+          >
+            <AlignLeft className="h-3.5 w-3.5" />
+            <span>أشرطة أفقية</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setChartOrientation('vertical')}
+            className={`flex-1 text-[11px] font-black py-1 px-1.5 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
+              chartOrientation === 'vertical' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+            }`}
+            title="عرض رأسي (أعمدة رأسية)"
+          >
+            <BarChart2 className="h-3.5 w-3.5" />
+            <span>أعمدة رأسية</span>
+          </button>
+        </div>
+
+        {/* Unit & Top Limit */}
+        <div className="flex items-center gap-1.5">
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 flex-1">
             <button
               type="button"
@@ -260,11 +329,12 @@ export const SegmentLengthChart: React.FC<SegmentLengthChartProps> = ({
           <select
             value={topLimit}
             onChange={(e) => setTopLimit(Number(e.target.value))}
-            className="text-xs font-bold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            className="text-xs font-bold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-2 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
             <option value={10}>أعلى 10</option>
             <option value={15}>أعلى 15</option>
-            <option value={30}>أعلى 30</option>
+            <option value={25}>أعلى 25</option>
+            <option value={50}>أعلى 50</option>
             <option value={0}>الكل</option>
           </select>
         </div>
@@ -286,45 +356,104 @@ export const SegmentLengthChart: React.FC<SegmentLengthChartProps> = ({
 
       {/* Chart Canvas */}
       {chartData.length > 0 ? (
-        <div className="h-72 w-full pt-2">
+        <div style={{ height: `${dynamicChartHeight}px` }} className="w-full pt-2 transition-all duration-300">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 30 }}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-              <XAxis
-                dataKey="displayName"
-                angle={-25}
-                textAnchor="end"
-                interval={0}
-                tick={{ fontSize: 10, fill: '#888888', fontWeight: 'bold' }}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: '#888888', fontWeight: 'bold' }}
-                unit={unit === 'km' ? ' كم' : ' م'}
-              />
-              <RechartsTooltip content={<CustomTooltip />} />
-              <Bar
-                dataKey="chartLength"
-                radius={[6, 6, 0, 0]}
-                onClick={(data) => {
-                  if (data && onSelectSegment) {
-                    onSelectSegment(data.segmentId);
-                  }
-                }}
-                className="cursor-pointer"
+            {chartOrientation === 'horizontal' ? (
+              <BarChart
+                data={chartData}
+                layout="vertical"
+                margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
               >
-                {chartData.map((entry, index) => {
-                  const color = entry.segmentId.includes('بدون معرف')
-                    ? '#f43f5e'
-                    : (entry.primaryColor || '#3b82f6');
-                  return <Cell key={`cell-${index}`} fill={color} />;
-                })}
-              </Bar>
-            </BarChart>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.15} horizontal={true} vertical={true} />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 10, fill: '#888888', fontWeight: 'bold' }}
+                  unit={unit === 'km' ? ' كم' : ' م'}
+                />
+                <YAxis
+                  dataKey="displayName"
+                  type="category"
+                  width={140}
+                  tick={{ fontSize: 11, fill: '#475569', fontWeight: 'bold' }}
+                  interval={0}
+                />
+                <RechartsTooltip content={<CustomTooltip />} />
+                <Bar
+                  dataKey="chartLength"
+                  radius={[0, 6, 6, 0]}
+                  onClick={(data) => {
+                    if (data && onSelectSegment) {
+                      onSelectSegment(data.segmentId);
+                    }
+                  }}
+                  className="cursor-pointer"
+                >
+                  {chartData.map((entry, index) => {
+                    const color = entry.segmentId.includes('بدون معرف')
+                      ? '#f43f5e'
+                      : (entry.primaryColor || '#3b82f6');
+                    return (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={color}
+                        stroke={color.toLowerCase() === '#ffea00' ? '#ca8a04' : undefined}
+                        strokeWidth={color.toLowerCase() === '#ffea00' ? 1.5 : 0}
+                      />
+                    );
+                  })}
+                </Bar>
+              </BarChart>
+            ) : (
+              <BarChart
+                data={chartData}
+                layout="horizontal"
+                margin={{ top: 10, right: 10, left: 10, bottom: 55 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                <XAxis
+                  dataKey="displayName"
+                  angle={-35}
+                  textAnchor="end"
+                  interval={0}
+                  height={50}
+                  tick={{ fontSize: 10, fill: '#888888', fontWeight: 'bold' }}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: '#888888', fontWeight: 'bold' }}
+                  unit={unit === 'km' ? ' كم' : ' م'}
+                />
+                <RechartsTooltip content={<CustomTooltip />} />
+                <Bar
+                  dataKey="chartLength"
+                  radius={[6, 6, 0, 0]}
+                  onClick={(data) => {
+                    if (data && onSelectSegment) {
+                      onSelectSegment(data.segmentId);
+                    }
+                  }}
+                  className="cursor-pointer"
+                >
+                  {chartData.map((entry, index) => {
+                    const color = entry.segmentId.includes('بدون معرف')
+                      ? '#f43f5e'
+                      : (entry.primaryColor || '#3b82f6');
+                    return (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={color}
+                        stroke={color.toLowerCase() === '#ffea00' ? '#ca8a04' : undefined}
+                        strokeWidth={color.toLowerCase() === '#ffea00' ? 1.5 : 0}
+                      />
+                    );
+                  })}
+                </Bar>
+              </BarChart>
+            )}
           </ResponsiveContainer>
         </div>
       ) : (
         <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
-          لا توجد بيانات سجمنت مطابقة للفلترة الحالية.
+          لا توجد بيانات قطاعات مطابقة لخيارات الفلترة الحالية.
         </div>
       )}
     </div>
