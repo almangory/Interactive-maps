@@ -695,6 +695,7 @@ export function cleanPermitNo(val: any): string {
     return '';
   }
 
+  return str;
 }
 
 /**
