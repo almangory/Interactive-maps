@@ -3,21 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { HistoricalReport, ProjectChangelogRecord, KMLAnalysisResult, ProjectDiffResult } from '../types';
 import { getSharedSupabaseClient } from '../supabase';
 import { isValidIdentifier, cleanPermitNo, cleanSegmentId, isYellowItemWithoutPermit } from './myMapsKmlParser';
 
-export function getSupabaseConfig() {
-  const metaEnv = (import.meta as any).env || {};
-  const url = metaEnv.VITE_SUPABASE_URL || localStorage.getItem('VITE_SUPABASE_URL') || '';
-  const anonKey = metaEnv.VITE_SUPABASE_ANON_KEY || localStorage.getItem('VITE_SUPABASE_ANON_KEY') || '';
-  return { url, anonKey };
-}
-
-export function saveSupabaseConfig(url: string, anonKey: string) {
-  if (url) localStorage.setItem('VITE_SUPABASE_URL', url.trim());
-  if (anonKey) localStorage.setItem('VITE_SUPABASE_ANON_KEY', anonKey.trim());
+export function getDatabaseClient(): any {
+  return getSharedSupabaseClient();
 }
 
 export function getSupabaseClient(): any {
@@ -767,6 +758,21 @@ export const ReportHistoryStore = {
 
     const mem = memoryReports.find(r => isReportMatchingProject(r.projectId, r.projectName, numId, cleanName, po));
     return mem || null;
+  },
+
+        if (rows.length > 0) {
+          const report = mapRowToHistoricalReport(rows[0]);
+          if (isReportMatchingProject(report.projectId, report.projectName, numId, cleanName, po)) {
+            return report;
+          }
+        }
+      } catch (err) {
+        console.error('Supabase getLatestReport exception:', err);
+      }
+    }
+
+    const reports = await this.getHistoricalReports(projectId, projectName, po);
+    return reports.length > 0 ? reports[0] : null;
   },
 
   async saveReport(

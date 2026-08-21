@@ -416,7 +416,7 @@ export default function App() {
   const [showRoleSwitcherDropdown, setShowRoleSwitcherDropdown] = useState(false);
   const [successNotification, setSuccessNotification] = useState('');
   const [showExitModal, setShowExitModal] = useState(false);
-  const [supabaseError, setSupabaseError] = useState<string | null>(null);
+  const [databaseError, setDatabaseError] = useState<string | null>(null);
 
   // 3.0. Offline/Online Status Monitor
   const [isOnline, setIsOnline] = useState<boolean>(() => typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -480,8 +480,8 @@ export default function App() {
     }
   };
 
-  // دالة جلب البيانات من Supabase عند تشغيل الموقع
-  const fetchDataFromSupabase = async (userToUse?: User) => {
+  // دالة جلب البيانات من قاعدة بيانات Neon عند تشغيل الموقع
+  const fetchDataFromDatabase = async (userToUse?: User) => {
     const activeUser = userToUse || currentUser;
     const isActuallyLogged = isLogged || !!userToUse;
     
@@ -512,10 +512,10 @@ export default function App() {
       }
 
       if (projError) {
-        console.warn("فشل الاتصال بـ Supabase:", projError.message);
-        setSupabaseError(projError.message);
+        console.warn("فشل الاتصال بقاعدة البيانات:", projError.message);
+        setDatabaseError(projError.message);
       } else if (dbProjects && dbProjects.length > 0) {
-        setSupabaseError(null);
+        setDatabaseError(null);
         const mappedProjects = dbProjects.map((p: any) => ({
           id: Number(p.id) || p.id,
           operationalNumber: p.operational_number || p.operationalNumber || '',
@@ -643,7 +643,7 @@ export default function App() {
   useEffect(() => {
     setActiveTab('maps');
     if (isLogged) {
-      fetchDataFromSupabase();
+      fetchDataFromDatabase();
     } else {
       setIsLoading(false);
     }
@@ -1182,7 +1182,7 @@ export default function App() {
       
       requestNotificationPermission(mappedUser.name);
 
-      await fetchDataFromSupabase(mappedUser);
+      await fetchDataFromDatabase(mappedUser);
     } catch (err) {
       console.error(err);
       setLoginError('حدث خطأ أثناء الاتصال بقاعدة البيانات.');
@@ -1252,7 +1252,7 @@ export default function App() {
         try {
           await supabase.from('users').insert([newAdminUser]);
         } catch (insertErr) {
-          console.warn("تعذر إضافة مدير النظام تلقائياً لسوبابيس:", insertErr);
+          console.warn("تعذر إضافة مدير النظام تلقائياً لقاعدة البيانات:", insertErr);
         }
 
         found = newAdminUser;
@@ -1314,7 +1314,7 @@ export default function App() {
       
       requestNotificationPermission('مدير النظام');
 
-      await fetchDataFromSupabase(mappedUser);
+      await fetchDataFromDatabase(mappedUser);
     } catch (err) {
       console.error(err);
       setLoginError('حدث خطأ أثناء الاتصال بقاعدة البيانات.');
@@ -1544,7 +1544,7 @@ export default function App() {
         : await supabase.from('users').insert([{ id: updatedUser.id, ...payload }]);
 
       if (error) {
-        console.warn("تعذر إضافة الأعمدة المتقدمة في Supabase، جاري الحفظ بالأعمدة الأساسية:", error.message);
+        console.warn("تعذر إضافة الأعمدة المتقدمة في قاعدة البيانات، جاري الحفظ بالأعمدة الأساسية:", error.message);
         const fallbackPayload = {
           username: updatedUser.username,
           name: updatedUser.name,
@@ -1560,7 +1560,7 @@ export default function App() {
     } catch (err: any) {
       console.error(err);
     }
-    fetchDataFromSupabase();
+    fetchDataFromDatabase();
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -1569,7 +1569,7 @@ export default function App() {
     } catch (err: any) {
       console.error(err);
     }
-    fetchDataFromSupabase();
+    fetchDataFromDatabase();
   };
 
   if (!isLogged) {
