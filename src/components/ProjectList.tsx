@@ -73,6 +73,8 @@ export function ProjectList({
   currentUser,
   onToggleFavorite,
   onEditProject,
+  onTriggerQuickAnalysis,
+  onOpenProjectDiff,
   searchTerm,
   setSearchTerm,
   selectedSubProgram,
