@@ -1102,20 +1102,29 @@ export function parseKMLContent(xmlString: string, projectName: string = 'مشر
   const items: KMLFeatureItem[] = [];
 
   placemarks.forEach((pm, idx) => {
-    // Process all GIS placemarks (LineString, Track, MultiLineString, Polygon, LinearRing, MultiGeometry)
+    // 🛡️ Strict Filter: Exclude Polygons, LinearRings (belonging to Polygons), and Points/Markers.
+    // The inspection and recording applies strictly to Line layers (LineString, Track, MultiLineString).
+    const polygonNodes = Array.from(pm.getElementsByTagName('Polygon'));
+    if (polygonNodes.length > 0) {
+      return; // Skip Polygon placemarks
+    }
+
+    const description = pm.getElementsByTagName('description')[0]?.textContent?.trim() || '';
+    if (/(?:SHAPE\s+Polygon|SHAPE\s*[:=]\s*Polygon)/i.test(description)) {
+      return; // Skip polygon descriptions
+    }
+
     const allChildElements = Array.from(pm.getElementsByTagName('*'));
-    
-    // Find all line and polygon geometry nodes
     const lineStringNodes = allChildElements.filter(el => {
       const name = (el.localName || el.tagName || '').toLowerCase();
-      return name === 'linestring' || name === 'track' || name === 'multilinestring' || name === 'linearring' || name === 'polygon';
+      return name === 'linestring' || name === 'track' || name === 'multilinestring';
     });
 
-    // Also look for coordinates elements directly in Placemark if no wrapper node found
-    const directCoordsNodes = lineStringNodes.length === 0 ? Array.from(pm.getElementsByTagName('coordinates')) : [];
+    if (lineStringNodes.length === 0) {
+      return; // Skip non-LineString placemarks (Points, Markers, empty geometries)
+    }
 
     const name = pm.getElementsByTagName('name')[0]?.textContent?.trim() || `قطاع خط ${idx + 1}`;
-    const description = pm.getElementsByTagName('description')[0]?.textContent?.trim() || '';
     const styleUrl = pm.getElementsByTagName('styleUrl')[0]?.textContent?.trim() || '';
     const descText = description.replace(/<[^>]+>/g, ' ');
 
@@ -1280,8 +1289,7 @@ export function parseKMLContent(xmlString: string, projectName: string = 'مشر
     let sumLng = 0;
     let validPtsCount = 0;
 
-    const targetGeomNodes = lineStringNodes.length > 0 ? lineStringNodes : directCoordsNodes;
-    targetGeomNodes.forEach(ls => {
+    lineStringNodes.forEach(ls => {
       let coordsText = '';
       const coordsNode = (ls.localName || ls.tagName || '').toLowerCase() === 'coordinates' 
         ? ls 
