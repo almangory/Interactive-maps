@@ -147,7 +147,8 @@ export function UserManagement({
     { id: 'maps', label: language === 'en' ? 'Interactive Maps 🗺️' : 'الخرائط التفاعلية 🗺️' },
     { id: 'stats', label: language === 'en' ? 'GIS Statistics 📊' : 'الإحصائيات الجغرافية 📊' },
     { id: 'layers', label: language === 'en' ? 'Project Layers 🥞' : 'طبقات المشاريع 🥞' },
-    { id: 'changelog', label: language === 'en' ? 'Change Log 📜' : 'سجل التغييرات 📜' }
+    { id: 'changelog', label: language === 'en' ? 'Change Log 📜' : 'سجل التغييرات 📜' },
+    { id: 'maptools', label: language === 'en' ? 'Map Tools 🛠️' : 'أدوات الخرائط 🛠️' }
   ], [language]);
 
   const LAYER_OPTIONS = useMemo(() => [
@@ -1419,7 +1420,7 @@ export function UserManagement({
                     <div className="flex flex-wrap gap-1.5">
                       {(selectedUser.allowedTabs || ['maps', 'stats', 'layers']).map(tab => (
                         <span key={tab} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[10px] font-bold">
-                          {tab === 'maps' ? (language === 'en' ? 'Maps' : 'الخرائط التفاعلية') : tab === 'stats' ? (language === 'en' ? 'Stats' : 'الإحصائيات') : tab === 'layers' ? (language === 'en' ? 'Layers' : 'طبقات المشاريع') : tab}
+                          {tab === 'maps' ? (language === 'en' ? 'Maps' : 'الخرائط التفاعلية') : tab === 'stats' ? (language === 'en' ? 'Stats' : 'الإحصائيات') : tab === 'layers' ? (language === 'en' ? 'Layers' : 'طبقات المشاريع') : tab === 'changelog' ? (language === 'en' ? 'Changelog' : 'سجل التغييرات') : tab === 'maptools' ? (language === 'en' ? 'Map Tools' : 'أدوات الخرائط') : tab}
                         </span>
                       ))}
                     </div>

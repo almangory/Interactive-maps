@@ -53,7 +53,10 @@ import {
   Sun,
   Moon,
   History,
-  Globe
+  Globe,
+  Wrench,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { useLanguage } from './utils/i18n';
 
@@ -412,7 +415,7 @@ export default function App() {
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
 
   // 3. UI Control State
-  const [activeTab, setActiveTab] = useState<'maps' | 'stats' | 'layers' | 'users' | 'settings'>('maps');
+  const [activeTab, setActiveTab] = useState<'maps' | 'stats' | 'layers' | 'changelog' | 'maptools' | 'users' | 'settings'>('maps');
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [mobileViewMode, setMobileViewMode] = useState<'map' | 'list'>('map');
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
@@ -1827,10 +1830,11 @@ export default function App() {
         <div className="border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-2xs transition-colors">
           <div className="flex gap-1.5 overflow-x-auto w-full sm:w-auto">
             {[
-              ...((currentUser.role === 'admin' || (currentUser.allowedTabs || ['maps', 'stats', 'layers', 'changelog']).includes('maps')) ? [{ id: 'maps', label: t('tab.maps'), icon: MapIcon }] : []),
-              ...((currentUser.role === 'admin' || (currentUser.allowedTabs || ['maps', 'stats', 'layers', 'changelog']).includes('stats')) ? [{ id: 'stats', label: t('tab.stats'), icon: Layers }] : []),
-              ...((currentUser.role === 'admin' || (currentUser.allowedTabs || ['maps', 'stats', 'layers', 'changelog']).includes('layers')) ? [{ id: 'layers', label: t('tab.layers'), icon: Compass }] : []),
-              ...((currentUser.role === 'admin' || (currentUser.allowedTabs || ['maps', 'stats', 'layers', 'changelog']).includes('changelog')) ? [{ id: 'changelog', label: t('tab.changelog'), icon: History }] : []),
+              ...((currentUser.role === 'admin' || (currentUser.allowedTabs || ['maps', 'stats', 'layers', 'changelog', 'maptools']).includes('maps')) ? [{ id: 'maps', label: t('tab.maps'), icon: MapIcon }] : []),
+              ...((currentUser.role === 'admin' || (currentUser.allowedTabs || ['maps', 'stats', 'layers', 'changelog', 'maptools']).includes('stats')) ? [{ id: 'stats', label: t('tab.stats'), icon: Layers }] : []),
+              ...((currentUser.role === 'admin' || (currentUser.allowedTabs || ['maps', 'stats', 'layers', 'changelog', 'maptools']).includes('layers')) ? [{ id: 'layers', label: t('tab.layers'), icon: Compass }] : []),
+              ...((currentUser.role === 'admin' || (currentUser.allowedTabs || ['maps', 'stats', 'layers', 'changelog', 'maptools']).includes('changelog')) ? [{ id: 'changelog', label: t('tab.changelog'), icon: History }] : []),
+              { id: 'maptools', label: t('tab.maptools'), icon: Wrench },
               ...(currentUser.role === 'admin' ? [{ id: 'users', label: t('tab.users'), icon: Users }] : []),
               { id: 'settings', label: t('tab.settings'), icon: Sliders }
             ].map(tab => {
@@ -1920,6 +1924,66 @@ export default function App() {
                 setMobileViewMode('map'); 
               }} 
             />
+          )}
+          {activeTab === 'maptools' && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shrink-0">
+                    <Wrench className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>{language === 'ar' ? 'منصة أدوات الخرائط الجغرافية الذكية' : 'Smart Map Tools & GIS Suite'}</span>
+                      <span className="text-[10px] bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-bold border border-blue-200 dark:border-blue-800 font-mono">
+                        map-tools-657.pages.dev
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {language === 'ar' ? 'منصة متقدمة لمعالجة واستخراج وتدقيق بيانات الخرائط الجغرافية وKML/KMZ وتوليد الأكواد' : 'Advanced suite for GIS data extraction, formatting, and KML/KMZ conversion'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const iframe = document.getElementById('map-tools-iframe') as HTMLIFrameElement;
+                      if (iframe) {
+                        iframe.src = iframe.src;
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-slate-200 dark:border-slate-700"
+                    title={language === 'ar' ? 'إعادة تحميل' : 'Reload'}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{language === 'ar' ? 'تحديث' : 'Reload'}</span>
+                  </button>
+
+                  <a
+                    href="https://map-tools-657.pages.dev/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>{language === 'ar' ? 'فتح في نافذة جديدة ↗' : 'Open in New Window ↗'}</span>
+                  </a>
+                </div>
+              </div>
+
+              <div className="w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-lg overflow-hidden relative" style={{ height: 'calc(100vh - 240px)', minHeight: '650px' }}>
+                <iframe
+                  id="map-tools-iframe"
+                  src="https://map-tools-657.pages.dev/"
+                  title="Map Tools Platform"
+                  className="w-full h-full border-0 rounded-2xl"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; geolocation"
+                  loading="lazy"
+                />
+              </div>
+            </div>
           )}
           {activeTab === 'users' && currentUser.role === 'admin' && <UserManagement users={users} currentUser={currentUser} onSaveUser={handleSaveUserPermissions} onDeleteUser={handleDeleteUser} projects={projects} />}
           {activeTab === 'settings' && (

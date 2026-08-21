@@ -35,7 +35,7 @@ export interface User {
   password?: string; // كلمة المرور الخاصة بالمستخدم
   
   // خصائص الصلاحيات الجديدة للموقع
-  allowedTabs?: string[]; // التبويبات المسموحة: ["maps", "stats", "layers", "users"]
+  allowedTabs?: string[]; // التبويبات المسموحة: ["maps", "stats", "layers", "changelog", "maptools", "users"]
   canOpenExternalLinks?: boolean; // فتح روابط خارجية
   canFilter?: boolean; // التصفية والبحث
   canInsert?: boolean; // إدراج مشاريع جديدة

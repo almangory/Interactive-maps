@@ -36,6 +36,7 @@ export const translations: TranslationsDictionary = {
   'tab.stats': { ar: 'الإحصائيات', en: 'Dashboard & Statistics' },
   'tab.layers': { ar: 'طبقات المشاريع', en: 'Project Layers' },
   'tab.changelog': { ar: 'سجل التغييرات', en: 'Changelog' },
+  'tab.maptools': { ar: 'أدوات الخرائط 🛠️', en: 'Map Tools 🛠️' },
   'tab.users': { ar: 'إدارة وتوزيع صلاحيات الحسابات', en: 'User Management & Permissions' },
   'tab.settings': { ar: 'إعدادات الإشعارات', en: 'Notification Settings' },
   'tab.projectList': { ar: 'قائمة المشاريع', en: 'Projects List' },
