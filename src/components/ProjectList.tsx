@@ -796,7 +796,6 @@ export function ProjectList({
                     </button>
                   )}
 
-                <div className="flex items-center gap-1.5">
                   {p.mapUrl && onTriggerQuickAnalysis && (
                     <button
                       type="button"
