@@ -20,9 +20,7 @@ export function saveSupabaseConfig(url: string, anonKey: string) {
   if (anonKey) localStorage.setItem('VITE_SUPABASE_ANON_KEY', anonKey.trim());
 }
 
-export function getSupabaseClient(): SupabaseClient | null {
-  const { url, anonKey } = getSupabaseConfig();
-  if (!url || !anonKey) return null;
+export function getSupabaseClient(): any {
   return getSharedSupabaseClient();
 }
 
@@ -769,6 +767,21 @@ export const ReportHistoryStore = {
 
     const mem = memoryReports.find(r => isReportMatchingProject(r.projectId, r.projectName, numId, cleanName, po));
     return mem || null;
+  },
+
+        if (rows.length > 0) {
+          const report = mapRowToHistoricalReport(rows[0]);
+          if (isReportMatchingProject(report.projectId, report.projectName, numId, cleanName, po)) {
+            return report;
+          }
+        }
+      } catch (err) {
+        console.error('Supabase getLatestReport exception:', err);
+      }
+    }
+
+    const reports = await this.getHistoricalReports(projectId, projectName, po);
+    return reports.length > 0 ? reports[0] : null;
   },
 
   async saveReport(
