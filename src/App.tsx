@@ -92,12 +92,16 @@ export const getActualProjectScope = (proj: Project): string => {
 export const isProjectAllowedForUser = (p: Project, currentUser: User): boolean => {
   if (currentUser.role === 'admin') return true;
   
+  // 1. Custom Project IDs constraint (if specified, project must be in the list)
   if (currentUser.allowedProjectIds && currentUser.allowedProjectIds.length > 0) {
     const allowed = currentUser.allowedProjectIds.map(Number);
-    return allowed.includes(Number(p.id));
+    if (!allowed.includes(Number(p.id))) {
+      return false;
+    }
   }
 
-  const uRegions = (currentUser.allowedRegions || []).map(r => r.trim());
+  // 2. Geographic & Region constraint
+  const uRegions = (currentUser.allowedRegions || ['الكل']).map(r => r.trim());
   const isAllRegions = uRegions.includes('الكل');
   
   let isRegionAllowed = isAllRegions;

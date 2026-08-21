@@ -203,22 +203,75 @@ export function UserManagement({
 
   const isAdmin = currentUser.role === 'admin';
 
-  // Compute unique sub-programs from projects list
-  const subPrograms = useMemo(() => {
-    const set = new Set(projects.map(p => p.subProgram).filter(Boolean));
-    return Array.from(set).sort();
-  }, [projects]);
+  // Helper to test if a project matches the base permissions (regions, scopes, statuses)
+  const isProjectMatchingBasePermissions = (p: Project, form: Partial<User>) => {
+    // 1. Region check
+    const uRegions = (form.allowedRegions || ['الكل']).map(r => r.trim());
+    const isAllRegions = uRegions.includes('الكل');
+    let isRegionAllowed = isAllRegions;
+    if (!isRegionAllowed) {
+      const pr = (p.region || '').trim();
+      const pb = (p.businessUnit || '').trim();
+      const ps = (p.subProgram || '').trim();
+      if (uRegions.includes(pr) || uRegions.includes(pb) || uRegions.includes(ps)) {
+        isRegionAllowed = true;
+      } else {
+        const northGovs = ['المجمعة', 'رماح', 'الزلفي', 'ثادق', 'حريملاء', 'الغاط', 'ثادق وحريملاء'];
+        const southGovs = ['السليل', 'وادي الدواسر', 'الأفلاج', 'حوطة بني تميم', 'الحريق', 'السيح', 'الخرج', 'تمرة', 'خيران', 'السيح والخرج'];
+        const westGovs = ['المزاحمية', 'شقراء', 'عفيف', 'القويعية', 'البجاديه', 'البجادية', 'ضرما', 'ضرماء', 'الدوادمي', 'شقراء ومرات', 'عفيف والدوادمي', 'المزاحمية و ضرماء'];
+        
+        if (uRegions.includes('المحافظات الشمالية') && (northGovs.includes(pr) || pr.includes('المجمعة') || pr.includes('رماح') || pr.includes('الزلفي') || pr.includes('حريملاء') || pr.includes('الغاط') || pr.includes('ثادق'))) {
+          isRegionAllowed = true;
+        }
+        if (uRegions.includes('المحافظات الجنوبية') && (southGovs.includes(pr) || pr.includes('السليل') || pr.includes('الدواسر') || pr.includes('الأفلاج') || pr.includes('تميم') || pr.includes('الخرج') || pr.includes('الحريق') || pr.includes('السيح'))) {
+          isRegionAllowed = true;
+        }
+        if (uRegions.includes('المحافظات الغربية') && (westGovs.includes(pr) || pr.includes('عفيف') || pr.includes('الدوادمي') || pr.includes('المزاحمية') || pr.includes('شقراء') || pr.includes('القويعية') || pr.includes('البجادية') || pr.includes('البجاديه') || pr.includes('ضرما') || pr.includes('ضرماء'))) {
+          isRegionAllowed = true;
+        }
+      }
+    }
 
-  // Set default sub-program when entering creation/editing
+    // 2. Scope check
+    const pScope = (p.scope || '').trim();
+    const uScopes = (form.allowedScopes || ['الكل']).map(s => s.trim());
+    const isAllScopes = uScopes.includes('الكل');
+    const isScopeAllowed = isAllScopes || uScopes.includes(pScope);
+
+    // 3. Status check
+    const pStatus = (p.status || '').trim();
+    const uStatuses = (form.allowedStatuses || ['الكل']).map(st => st.trim());
+    const isAllStatuses = uStatuses.includes('الكل') || uStatuses.length === 0;
+    const isStatusAllowed = isAllStatuses || uStatuses.includes(pStatus);
+
+    return isRegionAllowed && isScopeAllowed && isStatusAllowed;
+  };
+
+  // Compute eligible base projects matching current form's regions, scopes, and statuses
+  const eligibleBaseProjects = useMemo(() => {
+    return projects.filter(p => p.id !== -1 && isProjectMatchingBasePermissions(p, formData));
+  }, [projects, formData.allowedRegions, formData.allowedScopes, formData.allowedStatuses]);
+
+  // Compute unique sub-programs from eligibleBaseProjects list
+  const subPrograms = useMemo(() => {
+    const set = new Set(eligibleBaseProjects.map(p => p.subProgram).filter(Boolean));
+    return Array.from(set).sort();
+  }, [eligibleBaseProjects]);
+
+  // Set default sub-program when entering creation/editing or when eligible subPrograms change
   React.useEffect(() => {
-    if (subPrograms.length > 0 && !selectedSubProgramForPerms) {
-      setSelectedSubProgramForPerms(subPrograms[0]);
+    if (subPrograms.length > 0) {
+      if (!selectedSubProgramForPerms || (!subPrograms.includes(selectedSubProgramForPerms) && selectedSubProgramForPerms !== 'all')) {
+        setSelectedSubProgramForPerms('all');
+      }
+    } else {
+      setSelectedSubProgramForPerms('all');
     }
   }, [subPrograms, selectedSubProgramForPerms]);
 
   // Compute projects in the selected sub-program and filtered by status
   const projectsInSelectedSubProgram = useMemo(() => {
-    let list = projects.filter(p => p.id !== -1);
+    let list = eligibleBaseProjects;
     if (selectedSubProgramForPerms && selectedSubProgramForPerms !== 'all' && selectedSubProgramForPerms !== 'الكل') {
       list = list.filter(p => p.subProgram === selectedSubProgramForPerms);
     }
@@ -226,7 +279,7 @@ export function UserManagement({
       list = list.filter(p => (p.status || '').trim() === selectedStatusForPerms.trim());
     }
     return list;
-  }, [projects, selectedSubProgramForPerms, selectedStatusForPerms]);
+  }, [eligibleBaseProjects, selectedSubProgramForPerms, selectedStatusForPerms]);
 
   const handleSelectUser = (user: User) => {
     setSelectedUser(user);
@@ -284,43 +337,48 @@ export function UserManagement({
 
   const handleCheckboxChange = (field: 'allowedRegions' | 'allowedScopes' | 'allowedStatuses', value: string) => {
     const list = formData[field] || [];
+    let nextData: Partial<User>;
     
     if (value === 'الكل') {
-      const nextData: Partial<User> = {
+      nextData = {
         ...formData,
         [field]: ['الكل']
       };
       if (field === 'allowedScopes') {
         nextData.allowedLayers = ['water', 'sewage', 'materials'];
       }
-      setFormData(nextData);
-      return;
-    }
-
-    let newList = list.filter(item => item !== 'الكل');
-    if (newList.includes(value)) {
-      newList = newList.filter(item => item !== value);
     } else {
-      newList.push(value);
-    }
-
-    if (newList.length === 0) {
-      newList = ['الكل'];
-    }
-
-    const nextData: Partial<User> = {
-      ...formData,
-      [field]: newList
-    };
-
-    if (field === 'allowedScopes') {
-      if (newList.includes('الكل') || (newList.includes('مياه') && newList.includes('صرف صحي'))) {
-        nextData.allowedLayers = ['water', 'sewage', 'materials'];
-      } else if (newList.includes('مياه')) {
-        nextData.allowedLayers = ['water', 'materials'];
-      } else if (newList.includes('صرف صحي')) {
-        nextData.allowedLayers = ['sewage', 'materials'];
+      let newList = list.filter(item => item !== 'الكل');
+      if (newList.includes(value)) {
+        newList = newList.filter(item => item !== value);
+      } else {
+        newList.push(value);
       }
+
+      if (newList.length === 0) {
+        newList = ['الكل'];
+      }
+
+      nextData = {
+        ...formData,
+        [field]: newList
+      };
+
+      if (field === 'allowedScopes') {
+        if (newList.includes('الكل') || (newList.includes('مياه') && newList.includes('صرف صحي'))) {
+          nextData.allowedLayers = ['water', 'sewage', 'materials'];
+        } else if (newList.includes('مياه')) {
+          nextData.allowedLayers = ['water', 'materials'];
+        } else if (newList.includes('صرف صحي')) {
+          nextData.allowedLayers = ['sewage', 'materials'];
+        }
+      }
+    }
+
+    // 🔗 الربط الشامل والتلقائي: تنقية المشاريع المحددة بحيث لا يتبقى أي مشروع خارج الصلاحيات الجديدة
+    if (nextData.allowedProjectIds && nextData.allowedProjectIds.length > 0) {
+      const newEligibleIds = new Set(projects.filter(p => p.id !== -1 && isProjectMatchingBasePermissions(p, nextData)).map(p => p.id));
+      nextData.allowedProjectIds = nextData.allowedProjectIds.filter(id => newEligibleIds.has(id));
     }
 
     setFormData(nextData);
@@ -382,8 +440,8 @@ export function UserManagement({
   };
 
   const handleSelectAllProjectsAcrossAllPrograms = () => {
-    const allProjIds = projects.filter(p => p.id !== -1).map(p => p.id);
-    setFormData({ ...formData, allowedProjectIds: allProjIds });
+    const eligibleIds = eligibleBaseProjects.map(p => p.id);
+    setFormData({ ...formData, allowedProjectIds: eligibleIds });
   };
 
   const handleDeselectAllProjectsAcrossAllPrograms = () => {
@@ -1159,11 +1217,13 @@ export function UserManagement({
                     {language === 'en' ? 'Select sub-program to assign specific projects or include all.' : 'اختر البرنامج الفرعي، ثم عيّن مشاريع محددة للمستشار أو عيّنها كاملة.'}
                   </p>
                 </div>
-                {formData.allowedProjectIds && formData.allowedProjectIds.length > 0 && (
-                  <span className="text-[10px] px-2 py-0.5 bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-md font-bold">
-                    {language === 'en' ? 'Assigned Count: ' : 'إجمالي المشاريع المحددة المسموحة: '}{formData.allowedProjectIds.length}
-                  </span>
-                )}
+                <span className="text-[10px] px-2.5 py-1 bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-lg font-bold">
+                  {language === 'en' ? 'Selected Projects: ' : 'إجمالي المشاريع المحددة: '}
+                  <strong className="font-mono text-xs text-amber-900 dark:text-amber-100 underline">
+                    {formData.allowedProjectIds && formData.allowedProjectIds.length > 0 ? formData.allowedProjectIds.length : 0}
+                  </strong>
+                  {' '}{language === 'en' ? `of ${eligibleBaseProjects.length} eligible` : `من أصل ${eligibleBaseProjects.length} مشروع متاح`}
+                </span>
               </div>
 
               {/* Global control for all projects across all programs */}
@@ -1182,7 +1242,7 @@ export function UserManagement({
                     onClick={handleSelectAllProjectsAcrossAllPrograms}
                     className="px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white text-[10px] font-black rounded-lg transition-colors border-0 cursor-pointer shadow-3xs"
                   >
-                    {language === 'en' ? 'Select All Projects 🌐' : 'تحديد جميع المشاريع بكافة البرامج 🌐'}
+                    {language === 'en' ? `Select All Eligible (${eligibleBaseProjects.length}) 🌐` : `تحديد كافة المشاريع المتاحة والمصرح بها (${eligibleBaseProjects.length}) 🌐`}
                   </button>
                   <button
                     type="button"
