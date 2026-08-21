@@ -561,7 +561,7 @@ export const translations: TranslationsDictionary = {
   'lengths.bannerSubtitle': { ar: 'محدث مع الخرائط التفصيلية', en: 'Synchronized with detailed GIS maps' },
   'lengths.heading': { ar: 'تحليل أطوال العقود والرخص المعتمدة', en: 'Analysis of Contract Lengths & Approved Permits' },
   'lengths.desc': { ar: 'عرض تفصيلي لأطوال الخطوط (الكلية بالعقد، الجاري، المتبقية، والمنفذة)، وأعداد الرخص وأعداد القطاعات (السجمنت) مقسمة حسب النطاق والقطاع.', en: 'Detailed view of network lengths (contract total, ongoing, remaining, and executed), permit counts, and segment counts categorized by cluster and scope.' },
-  'lengths.syncSupabase': { ar: 'تحديث وتزامن Supabase', en: 'Refresh & Sync Supabase' },
+  'lengths.syncSupabase': { ar: 'تحديث', en: 'Refresh' },
   'lengths.printDashboard': { ar: 'طباعة الداشبورد', en: 'Print Dashboard' },
   'lengths.tabAll': { ar: '🌐 الكل (جميع المشاريع)', en: '🌐 All (All Projects)' },
   'lengths.tabRiyadh': { ar: '🏙️ مشاريع الرياض', en: '🏙️ Riyadh Projects' },
