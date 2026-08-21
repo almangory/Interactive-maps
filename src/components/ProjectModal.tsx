@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Project } from '../types';
-import { X, Save, AlertTriangle, Info, Map as MapIcon, CheckCircle } from 'lucide-react';
+import { X, Save, AlertTriangle, Info, Map, CheckCircle } from 'lucide-react';
 import { getWhatsAppLink, WhatsAppIcon } from '../utils/whatsapp';
 import { useLanguage } from '../utils/i18n';
 
@@ -144,8 +144,8 @@ export function ProjectModal({ isOpen, project, onClose, onSave }: ProjectModalP
       region: formData.region || 'شمال الرياض',
       subProgram: formData.subProgram || '',
       mapUrl: formData.mapUrl || '',
-      x: formData.x !== undefined && formData.x !== null ? Number(formData.x) : null,
-      y: formData.y !== undefined && formData.y !== null ? Number(formData.y) : null,
+      x: formData.x !== undefined && formData.x !== null && formData.x !== ('' as any) && !isNaN(Number(formData.x)) ? Number(formData.x) : null,
+      y: formData.y !== undefined && formData.y !== null && formData.y !== ('' as any) && !isNaN(Number(formData.y)) ? Number(formData.y) : null,
       surveyorName: formData.surveyorName || '',
       surveyorPhone: formData.surveyorPhone || '',
     };
@@ -161,7 +161,7 @@ export function ProjectModal({ isOpen, project, onClose, onSave }: ProjectModalP
         {/* Modal Header */}
         <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <MapIcon className="h-5 w-5 text-blue-400" />
+            <Map className="h-5 w-5 text-blue-400" />
             <h3 className="text-base font-bold">
               {project ? t('projModal.editTitle', 'تعديل بيانات المشروع والخرائط الفنية') : t('projModal.addTitle', 'إدراج مشروع تنفيذ وخارطة تفاعلية جديدة')}
             </h3>

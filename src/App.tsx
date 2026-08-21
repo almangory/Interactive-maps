@@ -1384,8 +1384,8 @@ export default function App() {
       region: savedProj.region,
       sub_program: savedProj.subProgram,
       map_url: savedProj.mapUrl,
-      x: savedProj.x !== undefined && savedProj.x !== null ? Number(savedProj.x) : null,
-      y: savedProj.y !== undefined && savedProj.y !== null ? Number(savedProj.y) : null,
+      x: savedProj.x !== undefined && savedProj.x !== null && savedProj.x !== ('' as any) && !isNaN(Number(savedProj.x)) ? Number(savedProj.x) : null,
+      y: savedProj.y !== undefined && savedProj.y !== null && savedProj.y !== ('' as any) && !isNaN(Number(savedProj.y)) ? Number(savedProj.y) : null,
       surveyor_name: savedProj.surveyorName || '',
       surveyor_phone: savedProj.surveyorPhone || ''
     };

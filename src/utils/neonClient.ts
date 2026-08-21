@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  * 
  * Neon PostgreSQL Client Adapter for Interactive Maps
- * Provides full compatibility with existing table query and mutation operations.
+ * Provides full compatibility with Supabase-style table queries, mutations (insert, update, upsert, delete),
+ * and live serverless execution on Cloudflare Pages and modern browsers.
  */
 
 import { neon } from '@neondatabase/serverless';
@@ -28,7 +29,7 @@ interface QueryOptions {
   onConflict?: string;
 }
 
-class NeonQueryBuilder {
+export class NeonQueryBuilder {
   private options: QueryOptions;
 
   constructor(table: string) {
@@ -39,13 +40,21 @@ class NeonQueryBuilder {
   }
 
   select(columns: string = '*'): this {
-    this.options.action = 'select';
-    this.options.columns = columns;
+    // If we are chaining .select() after an insert/update/upsert, do NOT change the action
+    if (this.options.action === 'select') {
+      this.options.columns = columns;
+    }
     return this;
   }
 
   insert(data: any): this {
     this.options.action = 'insert';
+    this.options.data = data;
+    return this;
+  }
+
+  update(data: any): this {
+    this.options.action = 'update';
     this.options.data = data;
     return this;
   }
@@ -77,7 +86,6 @@ class NeonQueryBuilder {
   }
 
   ilike(column: string, pattern: string): this {
-    // Treat as eq or contains in fallback
     this.options.eq_col = column;
     this.options.eq_val = pattern.replace(/%/g, '');
     return this;
@@ -153,6 +161,35 @@ class NeonQueryBuilder {
           if (res && res.length > 0) inserted.push(res[0]);
         }
         return { data: inserted, error: null };
+      }
+
+      if (action === 'update') {
+        const row = Array.isArray(data) ? data[0] : data;
+        const keys = Object.keys(row);
+        if (keys.length === 0) return { data: [], error: null };
+
+        const params: any[] = [];
+        const setClauses = keys.map(k => {
+          const v = row[k];
+          params.push(typeof v === 'object' && v !== null ? JSON.stringify(v) : v);
+          return `${k} = $${params.length}`;
+        });
+
+        let whereClause = '';
+        if (eq_col && eq_val !== undefined) {
+          params.push(eq_val);
+          whereClause = `WHERE ${eq_col} = $${params.length}`;
+        } else if (in_col && Array.isArray(in_vals) && in_vals.length > 0) {
+          const ph = in_vals.map(v => {
+            params.push(v);
+            return `$${params.length}`;
+          });
+          whereClause = `WHERE ${in_col} IN (${ph.join(', ')})`;
+        }
+
+        const sql = `UPDATE public.${safeTable} SET ${setClauses.join(', ')} ${whereClause} RETURNING *;`;
+        const res = await neonSql(sql, params);
+        return { data: res as any[], error: null };
       }
 
       if (action === 'upsert') {
