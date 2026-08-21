@@ -619,12 +619,14 @@ export default function App() {
             };
           });
 
-          setUsers(mappedUsers);
-          localStorage.setItem('water_maps_cached_users', JSON.stringify(mappedUsers));
+          // 🛡️ Strip sensitive password fields before caching in localStorage
+          const safeUsersForStorage = mappedUsers.map(({ password, ...rest }) => ({ ...rest, password: '' }));
+          setUsers(safeUsersForStorage);
+          localStorage.setItem('water_maps_cached_users', JSON.stringify(safeUsersForStorage));
 
           const savedAndActive = localStorage.getItem('water_maps_active_user_id');
           if (savedAndActive) {
-            const found = mappedUsers.find(u => u.id === savedAndActive);
+            const found = safeUsersForStorage.find(u => u.id === savedAndActive);
             if (found) setCurrentUser(found);
           }
         }
@@ -1173,7 +1175,9 @@ export default function App() {
       setActiveTab('maps');
       localStorage.setItem('water_maps_is_logged', 'true');
       localStorage.setItem('water_maps_active_user_id', mappedUser.id);
-      localStorage.setItem('water_maps_cached_users', JSON.stringify([mappedUser]));
+      // 🛡️ Strip sensitive password fields before caching in localStorage
+      const { password: _pwd1, ...safeUser1 } = mappedUser;
+      localStorage.setItem('water_maps_cached_users', JSON.stringify([{ ...safeUser1, password: '' }]));
       showNotification(`مرحباً بك مجدداً المهندس: ${mappedUser.name}`);
       
       requestNotificationPermission(mappedUser.name);
@@ -1303,7 +1307,9 @@ export default function App() {
       setActiveTab('maps');
       localStorage.setItem('water_maps_is_logged', 'true');
       localStorage.setItem('water_maps_active_user_id', mappedUser.id);
-      localStorage.setItem('water_maps_cached_users', JSON.stringify([mappedUser]));
+      // 🛡️ Strip sensitive password fields before caching in localStorage
+      const { password: _pwd2, ...safeUser2 } = mappedUser;
+      localStorage.setItem('water_maps_cached_users', JSON.stringify([{ ...safeUser2, password: '' }]));
       showNotification('أهلاً بك يا مدير النظام، تم تسجيل الدخول بنجاح.');
       
       requestNotificationPermission('مدير النظام');

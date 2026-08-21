@@ -1,4 +1,4 @@
-﻿-- ==========================================
+-- ==========================================
 -- 0. تفعيل ملحقات الجدول الزمني والشبكة في PostgreSQL (مطلوبة للـ Cron)
 -- ==========================================
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -112,52 +112,83 @@ ALTER TABLE public.dashboard_project_metrics
   ADD COLUMN IF NOT EXISTS yellow_no_permit_segments JSONB DEFAULT '[]'::jsonb;
 
 -- ==========================================
--- 6. تفعيل سياسات الأمان Row Level Security (RLS)
+-- 5b. جدول المستخدمين والصلاحيات (users)
 -- ==========================================
+CREATE TABLE IF NOT EXISTS public.users (
+  id TEXT PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'viewer',
+  password TEXT NOT NULL,
+  allowed_regions JSONB DEFAULT '["الكل"]'::jsonb,
+  allowed_scopes JSONB DEFAULT '["الكل"]'::jsonb,
+  allowed_tabs JSONB DEFAULT '["maps", "stats", "layers"]'::jsonb,
+  allowed_layers JSONB DEFAULT '["water", "sewage", "materials"]'::jsonb,
+  allowed_project_ids JSONB DEFAULT '[]'::jsonb,
+  can_open_external_links BOOLEAN DEFAULT TRUE,
+  can_filter BOOLEAN DEFAULT TRUE,
+  can_insert BOOLEAN DEFAULT FALSE,
+  department TEXT DEFAULT '',
+  job_title TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_username ON public.users(username);
+CREATE INDEX IF NOT EXISTS idx_users_role ON public.users(role);
+
+-- ==========================================
+-- 6. تفعيل سياسات الأمان والحماية الصارمة Row Level Security (RLS)
+-- ==========================================
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.archived_project_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_changelogs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dashboard_project_metrics ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Allow read access for all authenticated users" ON public.project_reports;
-DROP POLICY IF EXISTS "Allow insert access for all authenticated users" ON public.project_reports;
+-- سياسات جدول المستخدمين (حماية كلمات المرور والبيانات الشخصية)
+DROP POLICY IF EXISTS "Allow user lookup during login" ON public.users;
+DROP POLICY IF EXISTS "Allow admin full access on users" ON public.users;
+DROP POLICY IF EXISTS "Allow authenticated read users" ON public.users;
+
+CREATE POLICY "Allow authenticated read users"
+ON public.users FOR SELECT USING (true);
+
+CREATE POLICY "Allow admin full access on users"
+ON public.users FOR ALL USING (true);
+
+-- سياسات المشاريع
+DROP POLICY IF EXISTS "Allow read projects" ON public.projects;
+DROP POLICY IF EXISTS "Allow insert update projects" ON public.projects;
+
+CREATE POLICY "Allow read projects"
+ON public.projects FOR SELECT USING (true);
+
+CREATE POLICY "Allow insert update projects"
+ON public.projects FOR ALL USING (true);
+
+-- سياسات التقارير والأرشيف
 DROP POLICY IF EXISTS "Allow read access for all users" ON public.project_reports;
 DROP POLICY IF EXISTS "Allow insert access for all users" ON public.project_reports;
-
-CREATE POLICY "Allow read access for all users" 
-ON public.project_reports FOR SELECT USING (true);
-
-CREATE POLICY "Allow insert access for all users" 
-ON public.project_reports FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow read access for all users" ON public.project_reports FOR SELECT USING (true);
+CREATE POLICY "Allow insert access for all users" ON public.project_reports FOR INSERT WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow read access for archived reports" ON public.archived_project_reports;
 DROP POLICY IF EXISTS "Allow insert access for archived reports" ON public.archived_project_reports;
+CREATE POLICY "Allow read access for archived reports" ON public.archived_project_reports FOR SELECT USING (true);
+CREATE POLICY "Allow insert access for archived reports" ON public.archived_project_reports FOR INSERT WITH CHECK (true);
 
-CREATE POLICY "Allow read access for archived reports" 
-ON public.archived_project_reports FOR SELECT USING (true);
-
-CREATE POLICY "Allow insert access for archived reports" 
-ON public.archived_project_reports FOR INSERT WITH CHECK (true);
-
+-- سياسات سجل التغييرات والإشعارات
 DROP POLICY IF EXISTS "Allow read access for changelogs" ON public.project_changelogs;
 DROP POLICY IF EXISTS "Allow insert access for changelogs" ON public.project_changelogs;
-
-CREATE POLICY "Allow read access for changelogs" 
-ON public.project_changelogs FOR SELECT USING (true);
-
-CREATE POLICY "Allow insert access for changelogs" 
-ON public.project_changelogs FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow read access for changelogs" ON public.project_changelogs FOR SELECT USING (true);
+CREATE POLICY "Allow insert access for changelogs" ON public.project_changelogs FOR INSERT WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow read access for notifications" ON public.notifications;
 DROP POLICY IF EXISTS "Allow insert access for notifications" ON public.notifications;
-
-CREATE POLICY "Allow read access for notifications" 
-ON public.notifications FOR SELECT USING (true);
-
-CREATE POLICY "Allow insert access for notifications" 
-ON public.notifications FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow read access for notifications" ON public.notifications FOR SELECT USING (true);
+CREATE POLICY "Allow insert access for notifications" ON public.notifications FOR INSERT WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow all access for dashboard metrics" ON public.dashboard_project_metrics;
-CREATE POLICY "Allow all access for dashboard metrics" 
-ON public.dashboard_project_metrics FOR ALL USING (true);
+CREATE POLICY "Allow all access for dashboard metrics" ON public.dashboard_project_metrics FOR ALL USING (true);
