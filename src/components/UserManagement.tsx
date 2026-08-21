@@ -122,7 +122,7 @@ export function UserManagement({
       const term = searchTerm.trim().toLowerCase();
       const name = (u.name || '').toLowerCase();
       const username = (u.username || '').toLowerCase();
-      const email = `${username}@nwc.com.sa`.toLowerCase();
+      const email = ((u as any).email || u.username || '').toLowerCase();
       const jobTitle = (u.jobTitle || '').toLowerCase();
       const department = (u.department || '').toLowerCase();
       const regions = (u.allowedRegions || []).map(r => r.toLowerCase()).join(' ');
@@ -237,9 +237,7 @@ export function UserManagement({
   const handleStartEdit = () => {
     if (!isAdmin || !selectedUser) return;
     setIsEditing(true);
-    const displayedUsername = selectedUser.username.includes('@')
-      ? selectedUser.username
-      : `${selectedUser.username}@nwc.com.sa`;
+    const displayedUsername = selectedUser.username;
     
     setFormData({
       ...selectedUser,
@@ -359,15 +357,9 @@ export function UserManagement({
     }
 
     const emailInput = formData.username.trim().toLowerCase();
-    const nwcRegex = /^[a-zA-Z0-9._%+-]+@nwc\.com\.sa$/;
-    if (!nwcRegex.test(emailInput)) {
-      alert('خطأ في إدخال البريد: يجب أن ينتهي البريد الإلكتروني الرسمي للمستخدم بنطاق شركة المياه الوطنية @nwc.com.sa');
-      return;
-    }
-
-    const prefix = emailInput.split('@')[0];
-    if (!prefix) {
-      alert('الرجاء كتابة اسم المستخدم (البادئة) بشكل صحيح قبل النطاق.');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailInput)) {
+      alert('خطأ في إدخال البريد: يرجى كتابة بريد إلكتروني صحيح (مثال: user@example.com)');
       return;
     }
 
@@ -379,7 +371,7 @@ export function UserManagement({
 
     const savedUser: User = {
       id: formData.id || `user_${Date.now()}`,
-      username: prefix,
+      username: emailInput,
       name: formData.name.trim(),
       role: formData.role as 'admin' | 'editor' | 'viewer',
       allowedRegions: formData.allowedRegions || ['الكل'],
@@ -663,7 +655,7 @@ export function UserManagement({
                 <input
                   type="email"
                   required
-                  placeholder="f.mugrin@nwc.com.sa"
+                  placeholder="user@example.com"
                   className="w-full text-xs p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 font-mono text-left"
                   dir="ltr"
                   value={formData.username || ''}

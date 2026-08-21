@@ -90,10 +90,10 @@ export const translations: TranslationsDictionary = {
 
   // Login Screen
   'login.title': { ar: 'بوابة الخرائط الجغرافية', en: 'GIS Map Portal' },
-  'login.nwcEmployees': { ar: 'موظفو NWC', en: 'NWC Staff' },
+  'login.nwcEmployees': { ar: 'دخول المستخدمين', en: 'User Login' },
   'login.adminLogin': { ar: 'مدير النظام', en: 'System Admin' },
-  'login.emailLabel': { ar: 'البريد الإلكتروني للشركة:', en: 'Company Corporate Email:' },
-  'login.emailPlaceholder': { ar: 'username@nwc.com.sa', en: 'username@nwc.com.sa' },
+  'login.emailLabel': { ar: 'البريد الإلكتروني:', en: 'Email Address:' },
+  'login.emailPlaceholder': { ar: 'user@example.com', en: 'user@example.com' },
   'login.passwordLabel': { ar: 'كلمة المرور الخاصة بحسابك:', en: 'Account Password:' },
   'login.adminPassLabel': { ar: 'رمز المرور الأمني للمشرف العام:', en: 'Master Admin Security Code:' },
   'login.enterPortal': { ar: 'التحقق والدخول للبوابة الجغرافية', en: 'Authenticate & Access GIS Portal' },

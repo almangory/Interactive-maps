@@ -1099,27 +1099,34 @@ export default function App() {
     e.preventDefault();
     setLoginError('');
     const email = nwcEmail.trim().toLowerCase();
-    const nwcRegex = /^[a-zA-Z0-9._%+-]+@nwc\.com\.sa$/;
-    if (!nwcRegex.test(email)) {
-      setLoginError('يرجى التواصل مع مدير النظام almangoyo@gmail.com');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email) && !email.includes('@')) {
+      setLoginError('الرجاء إدخال بريد إلكتروني صحيح.');
       return;
     }
-    const prefix = email.split('@')[0];
+    const prefix = email.includes('@') ? email.split('@')[0] : email;
     
     setIsLoading(true);
     try {
       const { data, error } = await db
         .from('users')
-        .select('*')
-        .eq('username', prefix);
+        .select('*');
 
-      if (error || !data || data.length === 0) {
+      let found = null;
+      if (data && data.length > 0) {
+        found = data.find((u: any) => {
+          const uName = (u.username || '').trim().toLowerCase();
+          const uEmail = (u.email || '').trim().toLowerCase();
+          return uName === email || uName === prefix || uEmail === email || uEmail === prefix;
+        });
+      }
+
+      if (!found) {
         setLoginError('عذراً، هذا البريد غير معتمد ومسجل مسبقاً في النظام.');
         setIsLoading(false);
         return;
       }
 
-      const found = data[0];
       if (nwcPassword.trim() !== (found.password || 'nwc1234')) {
         setLoginError('كلمة المرور المدخلة غير صحيحة!');
         setIsLoading(false);
@@ -1619,7 +1626,7 @@ export default function App() {
             <form onSubmit={handleNwcSubmit} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-700 block">{t('login.emailLabel')}</label>
-                <input type="email" required value={nwcEmail} onChange={e => setNwcEmail(e.target.value)} placeholder="username@nwc.com.sa" className="w-full text-xs p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none text-slate-800 font-mono text-left" dir="ltr" />
+                <input type="email" required value={nwcEmail} onChange={e => setNwcEmail(e.target.value)} placeholder="user@example.com" className="w-full text-xs p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none text-slate-800 font-mono text-left" dir="ltr" />
               </div>
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-700 block">{t('login.passwordLabel')}</label>
