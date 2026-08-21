@@ -33,7 +33,7 @@ import {
 import { FeatureDetailsModal, FeatureDetailData } from './FeatureDetailsModal';
 import { groupYellowLineChangesByPermit } from '../utils/diffEngine';
 import { cleanStage } from '../utils/myMapsKmlParser';
-import { ReportHistoryStore } from '../utils/supabaseSetup';
+import { ReportHistoryStore } from '../utils/reportsStore';
 
 interface ProjectDiffModalProps {
   isOpen: boolean;
@@ -82,17 +82,7 @@ export function ProjectDiffModal({
 
   if (!isOpen || !diffResult) return null;
 
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 2500);
-  };
 
-  const handleCopyEdge = () => {
-    navigator.clipboard.writeText(SUPABASE_EDGE_FUNCTION_CODE);
-    setCopiedEdge(true);
-    setTimeout(() => setCopiedEdge(false), 2500);
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4 overflow-y-auto animate-fadeIn">
@@ -245,16 +235,6 @@ export function ProjectDiffModal({
             <History className="h-4 w-4" />
             <span>الأرشيف التاريخي ({historyList.length})</span>
           </button>
-
-          {isAdmin && (
-            <button
-              onClick={() => setActiveTab('sql')}
-              className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 cursor-pointer border-t border-x ${activeTab === 'sql' ? 'bg-white dark:bg-slate-900 text-cyan-600 dark:text-cyan-400 border-slate-200 dark:border-slate-800 shadow-sm' : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
-            >
-              <Database className="h-4 w-4" />
-              <span>استعلامات Supabase & Cron</span>
-            </button>
-          )}
         </div>
 
         {/* Tab Content Body */}

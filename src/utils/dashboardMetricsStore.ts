@@ -4,7 +4,7 @@
  */
 
 import { KMLAnalysisResult, Project, HistoricalReport } from '../types';
-import { getSupabaseClient, findReportForProject, isReportMatchingProject } from './supabaseSetup';
+import { getDatabaseClient, findReportForProject, isReportMatchingProject } from './reportsStore';
 import { isValidIdentifier, isYellowItemWithoutPermit, cleanSegmentId, cleanPermitNo } from './myMapsKmlParser';
 
 export interface DashboardProjectMetric {
@@ -212,11 +212,11 @@ export const DashboardMetricsStore = {
     localMap.forEach((v, k) => map.set(k, v));
     memoryMetricsMap.forEach((v, k) => map.set(k, v));
 
-    // 2. Fetch from Supabase dashboard_project_metrics table
-    const supabase = getSupabaseClient();
-    if (supabase) {
+    // 2. Fetch from Database dashboard_project_metrics table
+    const db = getDatabaseClient();
+    if (db) {
       try {
-        const { data, error } = await (supabase.from('dashboard_project_metrics') as any)
+        const { data, error } = await (db.from('dashboard_project_metrics') as any)
           .select('*')
           .order('project_id', { ascending: true });
 
@@ -256,7 +256,7 @@ export const DashboardMetricsStore = {
           saveLocalStorageMetrics(map);
         }
       } catch (err) {
-        console.error('Error loading dashboard_project_metrics from Supabase:', err);
+        console.error('Error loading dashboard_project_metrics from Database:', err);
       }
     }
 
@@ -276,9 +276,9 @@ export const DashboardMetricsStore = {
     localMap.set(projectId, metric);
     saveLocalStorageMetrics(localMap);
 
-    // Upsert into Supabase dashboard_project_metrics table
-    const supabase = getSupabaseClient();
-    if (supabase) {
+    // Upsert into Database dashboard_project_metrics table
+    const db = getDatabaseClient();
+    if (db) {
       try {
         const row = {
           project_id: projectId,
@@ -302,11 +302,11 @@ export const DashboardMetricsStore = {
           updated_at: new Date().toISOString()
         };
 
-        const { error } = await (supabase.from('dashboard_project_metrics') as any)
+        const { error } = await (db.from('dashboard_project_metrics') as any)
           .upsert([row], { onConflict: 'project_id' });
 
         if (error) {
-          console.warn('Supabase upsert dashboard_project_metrics warning:', error.message);
+          console.warn('Database upsert dashboard_project_metrics warning:', error.message);
         } else {
           console.log(`✅ Upserted dashboard metrics for project ID ${projectId} (${projectName})`);
         }
@@ -322,7 +322,7 @@ export const DashboardMetricsStore = {
     projects: Project[],
     reportsMap: Map<number, HistoricalReport>
   ): Promise<Map<number, DashboardProjectMetric>> {
-    // 1. Fetch existing metrics from Supabase / LocalStorage / Memory
+    // 1. Fetch existing metrics from Database / LocalStorage / Memory
     const existingDbMetricsMap = await this.getAllMetricsMap();
     const updatedMap = new Map<number, DashboardProjectMetric>();
     const rowsToUpsert: DashboardProjectMetric[] = [];
@@ -342,7 +342,7 @@ export const DashboardMetricsStore = {
         memoryMetricsMap.set(pId, metric);
         rowsToUpsert.push(metric);
       } else if (existingMetric && (existingMetric.totalLengthMeters > 0 || existingMetric.totalSegmentsCount > 0 || existingMetric.permitsCount > 0)) {
-        // PRESERVE existing valid metric from Supabase/database!
+        // PRESERVE existing valid metric from Database/database!
         updatedMap.set(pId, existingMetric);
         memoryMetricsMap.set(pId, existingMetric);
       } else if (savedRep && savedRep.analysisResult) {
@@ -383,9 +383,9 @@ export const DashboardMetricsStore = {
 
     saveLocalStorageMetrics(updatedMap);
 
-    // Bulk upsert ONLY updated non-zero project metrics into Supabase table if connected
-    const supabase = getSupabaseClient();
-    if (supabase && rowsToUpsert.length > 0) {
+    // Bulk upsert ONLY updated non-zero project metrics into Database table if connected
+    const db = getDatabaseClient();
+    if (db && rowsToUpsert.length > 0) {
       try {
         const payload = rowsToUpsert.map(metric => ({
           project_id: metric.projectId,
@@ -409,13 +409,13 @@ export const DashboardMetricsStore = {
           updated_at: metric.updatedAt || new Date().toISOString()
         }));
 
-        const { error } = await (supabase.from('dashboard_project_metrics') as any)
+        const { error } = await (db.from('dashboard_project_metrics') as any)
           .upsert(payload, { onConflict: 'project_id' });
 
         if (error) {
-          console.warn('Error bulk upserting dashboard_project_metrics to Supabase:', error.message);
+          console.warn('Error bulk upserting dashboard_project_metrics to Database:', error.message);
         } else {
-          console.log(`✅ Automatically populated/updated ${payload.length} rows in Supabase dashboard_project_metrics table.`);
+          console.log(`✅ Automatically populated/updated ${payload.length} rows in Database dashboard_project_metrics table.`);
         }
       } catch (err) {
         console.error('Exception bulk upserting dashboard metrics:', err);

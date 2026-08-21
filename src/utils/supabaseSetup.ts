@@ -4,318 +4,16 @@
  */
 
 import { HistoricalReport, ProjectChangelogRecord, KMLAnalysisResult, ProjectDiffResult } from '../types';
-import { getSharedSupabaseClient } from '../supabase';
+import { getSharedDbClient } from '../db';
 import { isValidIdentifier, cleanPermitNo, cleanSegmentId, isYellowItemWithoutPermit } from './myMapsKmlParser';
 
 export function getDatabaseClient(): any {
-  return getSharedSupabaseClient();
+  return getSharedDbClient();
 }
 
 export function getSupabaseClient(): any {
-  return getSharedSupabaseClient();
+  return getSharedDbClient();
 }
-
-/**
- * SQL Schema Script for Supabase Database setup
- */
-export const SUPABASE_SQL_SCHEMA = `-- ==========================================
--- 0. تفعيل ملحقات الجدول الزمني والشبكة في PostgreSQL (مطلوبة للـ Cron)
--- ==========================================
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
-
--- ==========================================
--- 1. جدول حفظ التقارير اليومية والتاريخية للمشاريع
--- ==========================================
-CREATE TABLE IF NOT EXISTS public.project_reports (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id INT NOT NULL,
-  project_name TEXT NOT NULL,
-  map_url TEXT,
-  total_length_meters NUMERIC NOT NULL,
-  total_length_km NUMERIC NOT NULL,
-  total_features_count INT NOT NULL,
-  color_breakdown JSONB NOT NULL,
-  items JSONB NOT NULL,
-  parsed_at TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_project_reports_proj_id ON public.project_reports(project_id);
-CREATE INDEX IF NOT EXISTS idx_project_reports_created_at ON public.project_reports(created_at DESC);
-
--- ==========================================
--- 1b. جدول أرشفة التقارير القديمة للمشاريع
--- ==========================================
-CREATE TABLE IF NOT EXISTS public.archived_project_reports (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  original_report_id UUID,
-  project_id INT NOT NULL,
-  project_name TEXT NOT NULL,
-  map_url TEXT,
-  total_length_meters NUMERIC NOT NULL,
-  total_length_km NUMERIC NOT NULL,
-  total_features_count INT NOT NULL,
-  color_breakdown JSONB NOT NULL,
-  items JSONB NOT NULL,
-  parsed_at TEXT NOT NULL,
-  original_created_at TIMESTAMPTZ,
-  archived_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_archived_reports_proj_id ON public.archived_project_reports(project_id);
-
--- ==========================================
--- 2. جدول سجل التغيرات والمقارنة التاريخية (Changelog)
--- ==========================================
-CREATE TABLE IF NOT EXISTS public.project_changelogs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id INT NOT NULL,
-  project_name TEXT NOT NULL,
-  report_id UUID REFERENCES public.project_reports(id) ON DELETE CASCADE,
-  previous_report_id UUID REFERENCES public.project_reports(id) ON DELETE SET NULL,
-  diff JSONB NOT NULL,
-  is_viewed BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_project_changelogs_proj_id ON public.project_changelogs(project_id);
-
--- ==========================================
--- 3. جدول الإشعارات والتنبيهات العامة لجميع المستخدمين
--- ==========================================
-CREATE TABLE IF NOT EXISTS public.notifications (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id TEXT,
-  project_id INT,
-  project_name TEXT NOT NULL,
-  type TEXT NOT NULL,
-  message TEXT NOT NULL,
-  region TEXT,
-  scope TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_notifications_proj_id ON public.notifications(project_id);
-
--- ==========================================
--- 5. جدول بيانات الداشبورد والمؤشرات المحسوبة لكل مشروع (dashboard_project_metrics)
--- ==========================================
-CREATE TABLE IF NOT EXISTS public.dashboard_project_metrics (
-  project_id INT PRIMARY KEY,
-  project_name TEXT NOT NULL,
-  total_length_meters NUMERIC NOT NULL DEFAULT 0,
-  total_length_km NUMERIC NOT NULL DEFAULT 0,
-  executed_water_meters NUMERIC NOT NULL DEFAULT 0,
-  executed_sewage_meters NUMERIC NOT NULL DEFAULT 0,
-  ongoing_meters NUMERIC NOT NULL DEFAULT 0,
-  remaining_meters NUMERIC NOT NULL DEFAULT 0,
-  cancelled_meters NUMERIC NOT NULL DEFAULT 0,
-  permits_count INT NOT NULL DEFAULT 0,
-  unique_segments_count INT NOT NULL DEFAULT 0,
-  total_segments_count INT NOT NULL DEFAULT 0,
-  permits_list JSONB DEFAULT '[]'::jsonb,
-  segments_list JSONB DEFAULT '[]'::jsonb,
-  yellow_no_permit_count INT NOT NULL DEFAULT 0,
-  yellow_no_permit_meters NUMERIC NOT NULL DEFAULT 0,
-  yellow_no_permit_km NUMERIC NOT NULL DEFAULT 0,
-  yellow_no_permit_segments JSONB DEFAULT '[]'::jsonb,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- تحديث وإضافة الأعمدة في حال كان الجدول منشأ مسبقاً
-ALTER TABLE public.dashboard_project_metrics 
-  ADD COLUMN IF NOT EXISTS yellow_no_permit_count INT NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS yellow_no_permit_meters NUMERIC NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS yellow_no_permit_km NUMERIC NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS yellow_no_permit_segments JSONB DEFAULT '[]'::jsonb;
-
--- ==========================================
--- 6. جدول المشاريع (projects)
--- ==========================================
-CREATE TABLE IF NOT EXISTS public.projects (
-  id BIGINT PRIMARY KEY,
-  operational_number TEXT,
-  name TEXT NOT NULL,
-  po TEXT,
-  unifier_no TEXT,
-  contractor TEXT,
-  consultant TEXT,
-  status TEXT,
-  scope TEXT,
-  classification TEXT,
-  business_unit TEXT,
-  region TEXT,
-  sub_program TEXT,
-  map_url TEXT,
-  x NUMERIC,
-  y NUMERIC,
-  surveyor_name TEXT,
-  surveyor_phone TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- ==========================================
--- 7. جدول المستخدمين (users)
--- ==========================================
-CREATE TABLE IF NOT EXISTS public.users (
-  id TEXT PRIMARY KEY,
-  username TEXT UNIQUE NOT NULL,
-  name TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'viewer',
-  password TEXT,
-  allowed_regions JSONB DEFAULT '["الكل"]'::jsonb,
-  allowed_scopes JSONB DEFAULT '["الكل"]'::jsonb,
-  allowed_tabs JSONB DEFAULT '["maps", "stats", "layers"]'::jsonb,
-  allowed_layers JSONB DEFAULT '["water", "sewage", "materials"]'::jsonb,
-  allowed_project_ids JSONB DEFAULT '[]'::jsonb,
-  can_open_external_links BOOLEAN DEFAULT TRUE,
-  can_filter BOOLEAN DEFAULT TRUE,
-  can_insert BOOLEAN DEFAULT TRUE,
-  department TEXT DEFAULT '',
-  job_title TEXT DEFAULT '',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- ==========================================
--- 8. تفعيل سياسات الأمان Row Level Security (RLS) الصارمة
--- ==========================================
-ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.project_reports ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.archived_project_reports ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.project_changelogs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.dashboard_project_metrics ENABLE ROW LEVEL SECURITY;
-
--- 🛡️ سياسات جدول المشاريع (projects): قراءة للجميع، وتعديل/إضافة للمصرح لهم
-DROP POLICY IF EXISTS "Allow read projects" ON public.projects;
-CREATE POLICY "Allow read projects" ON public.projects FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow modify projects" ON public.projects;
-CREATE POLICY "Allow modify projects" ON public.projects FOR ALL USING (true) WITH CHECK (true);
-
--- 🛡️ سياسات جدول المستخدمين (users)
-DROP POLICY IF EXISTS "Allow read users" ON public.users;
-CREATE POLICY "Allow read users" ON public.users FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow modify users" ON public.users;
-CREATE POLICY "Allow modify users" ON public.users FOR ALL USING (true) WITH CHECK (true);
-
--- 🛡️ سياسات التقارير وسجلات التغييرات والإشعارات
-DROP POLICY IF EXISTS "Allow read project_reports" ON public.project_reports;
-CREATE POLICY "Allow read project_reports" ON public.project_reports FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow insert project_reports" ON public.project_reports;
-CREATE POLICY "Allow insert project_reports" ON public.project_reports FOR INSERT WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Allow read archived_reports" ON public.archived_project_reports;
-CREATE POLICY "Allow read archived_reports" ON public.archived_project_reports FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow insert archived_reports" ON public.archived_project_reports;
-CREATE POLICY "Allow insert archived_reports" ON public.archived_project_reports FOR INSERT WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Allow read changelogs" ON public.project_changelogs;
-CREATE POLICY "Allow read changelogs" ON public.project_changelogs FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow insert changelogs" ON public.project_changelogs;
-CREATE POLICY "Allow insert changelogs" ON public.project_changelogs FOR INSERT WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Allow read notifications" ON public.notifications;
-CREATE POLICY "Allow read notifications" ON public.notifications FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow insert notifications" ON public.notifications;
-CREATE POLICY "Allow insert notifications" ON public.notifications FOR INSERT WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Allow all dashboard_metrics" ON public.dashboard_project_metrics;
-CREATE POLICY "Allow all dashboard_metrics" ON public.dashboard_project_metrics FOR ALL USING (true);
-`;
-
-/**
- * Supabase Edge Function / Cron Job TypeScript Code for Daily Automated Map Checks
- */
-export const SUPABASE_EDGE_FUNCTION_CODE = `// ==========================================
-// Supabase Edge Function: daily-kml-tracker
-// Path: supabase/functions/daily-kml-tracker/index.ts
-// ==========================================
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-serve(async (req) => {
-  try {
-    // 1. Fetch active projects with map URLs
-    const { data: projects, error: projErr } = await supabase
-      .from('projects')
-      .select('id, name, map_url');
-
-    if (projErr) throw projErr;
-
-    const summaryResults = [];
-
-    for (const proj of projects || []) {
-      if (!proj.map_url) continue;
-
-      // 2. Fetch latest saved report for project
-      const { data: latestReports } = await supabase
-        .from('project_reports')
-        .select('*')
-        .eq('project_id', proj.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      const previousReport = latestReports?.[0];
-
-      // 3. Fetch current KML from Google My Maps link & perform Turf length check
-      // (The edge function fetches the KML XML, processes LineStrings, and compares)
-      
-      summaryResults.push({
-        projectId: proj.id,
-        projectName: proj.name,
-        status: "Checked successfully"
-      });
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, checkedCount: summaryResults.length, summaryResults }),
-      { headers: { "Content-Type": "application/json" } }
-    );
-  } catch (err: any) {
-    return new Response(
-      JSON.stringify({ success: false, error: err.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
-  }
-});
-
-/*
--- ==========================================
--- كيفية تفعيل الـ Cron Job في Supabase:
--- ==========================================
--- الخطوة 1: قم بتشغيل الأمر التالي في SQL Editor لتفعيل الملحقات:
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
-
--- الخطوة 2: قم بجدولة المهمة اليومية (استبدل YOUR_SUPABASE_PROJECT_REF و YOUR_ANON_KEY ببيانات مشروعك):
-SELECT cron.schedule(
-  'daily-project-kml-check',
-  '0 2 * * *', -- يعمل يومياً الساعة 2 صباحاً
-  $$
-  SELECT
-    net.http_post(
-      url:='https://YOUR_SUPABASE_PROJECT_REF.functions.supabase.co/daily-kml-tracker',
-      headers:='{"Content-Type": "application/json", "Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb
-    ) as request_id;
-  $$
-);
-*/
-`;
 
 // In-memory fallback arrays (strictly no localStorage)
 const memoryReports: HistoricalReport[] = [];
@@ -546,7 +244,7 @@ export function isReportMatchingProject(rowProjId: number, rowProjName: string, 
   const numTargetId = Number(targetId);
   const numRowId = Number(rowProjId);
 
-  // 1. Direct project_id match (Highest priority: if project_id is identical in Supabase, it is the exact same project)
+  // 1. Direct project_id match (Highest priority: if project_id is identical in Database, it is the exact same project)
   if (!isNaN(numTargetId) && numTargetId > 0 && !isNaN(numRowId) && numRowId > 0 && numTargetId === numRowId) {
     return true;
   }
@@ -608,11 +306,11 @@ export function findReportForProject(p: { id: number; name: string; po?: string 
 export const ReportHistoryStore = {
   async getAllLatestReportsMap(projects?: any[]): Promise<Map<number, HistoricalReport>> {
     const map = new Map<number, HistoricalReport>();
-    const supabase = getSupabaseClient();
-    if (supabase) {
+    const db = getDatabaseClient();
+    if (db) {
       try {
         // 🚀 Only select lightweight summary columns (NO heavy items array)
-        const { data, error } = await (supabase.from('project_reports') as any)
+        const { data, error } = await (db.from('project_reports') as any)
           .select(LIGHTWEIGHT_REPORT_COLUMNS)
           .order('created_at', { ascending: false })
           .limit(300);
@@ -633,10 +331,10 @@ export const ReportHistoryStore = {
           }
         }
       } catch (err) {
-        console.error('Supabase getAllLatestReportsMap exception:', err);
+        console.error('Database getAllLatestReportsMap exception:', err);
       }
     }
-    // Prioritize latest in-memory session reports over Supabase stale cached rows
+    // Prioritize latest in-memory session reports over Neon Database stale cached rows
     for (const mem of memoryReports) {
       const mId = Number(mem.projectId);
       if (mId > 0) {
@@ -654,14 +352,14 @@ export const ReportHistoryStore = {
   },
 
   async getHistoricalReports(projectId: number, projectName?: string, po?: string): Promise<HistoricalReport[]> {
-    const supabase = getSupabaseClient();
+    const db = getDatabaseClient();
     const cleanName = (projectName || '').trim();
     const numId = Number(projectId);
 
-    if (supabase) {
+    if (db) {
       try {
         // 🚀 Targeted lightweight query (Only 5 latest rows and NO heavy items array)
-        let query = (supabase.from('project_reports') as any)
+        let query = (db.from('project_reports') as any)
           .select(LIGHTWEIGHT_REPORT_COLUMNS);
 
         if (!isNaN(numId) && numId > 0) {
@@ -678,7 +376,7 @@ export const ReportHistoryStore = {
           return data.map(mapRowToHistoricalReport);
         }
       } catch (err) {
-        console.error('Supabase getHistoricalReports exception:', err);
+        console.error('Database getHistoricalReports exception:', err);
       }
     }
 
@@ -689,13 +387,13 @@ export const ReportHistoryStore = {
   },
 
   async archiveOldReports(projectId: number, projectName: string): Promise<void> {
-    const supabase = getSupabaseClient();
+    const db = getDatabaseClient();
     const cleanName = (projectName || '').trim();
     const numId = Number(projectId);
 
-    if (supabase) {
+    if (db) {
       try {
-        let query = (supabase.from('project_reports') as any)
+        let query = (db.from('project_reports') as any)
           .select('id, project_id, project_name, created_at');
 
         if (!isNaN(numId) && numId > 0) {
@@ -710,12 +408,12 @@ export const ReportHistoryStore = {
         if (!error && data && data.length > 5) {
           const oldIds = data.slice(5).map((r: any) => r.id);
           if (oldIds.length > 0) {
-            await (supabase.from('project_reports') as any).delete().in('id', oldIds);
+            await (db.from('project_reports') as any).delete().in('id', oldIds);
             console.log(`📦 Cleaned up ${oldIds.length} old reports for project (${projectId})`);
           }
         }
       } catch (err) {
-        console.error('Supabase archiveOldReports exception:', err);
+        console.error('Database archiveOldReports exception:', err);
       }
     }
   },
@@ -731,11 +429,11 @@ export const ReportHistoryStore = {
       return cached.report;
     }
 
-    const supabase = getSupabaseClient();
+    const db = getDatabaseClient();
 
-    if (supabase) {
+    if (db) {
       try {
-        let query = (supabase.from('project_reports') as any)
+        let query = (db.from('project_reports') as any)
           .select('*');
 
         if (!isNaN(numId) && numId > 0) {
@@ -752,7 +450,7 @@ export const ReportHistoryStore = {
           return report;
         }
       } catch (err) {
-        console.error('Supabase getLatestReport exception:', err);
+        console.error('Database getLatestReport exception:', err);
       }
     }
 
@@ -787,11 +485,11 @@ export const ReportHistoryStore = {
 
     let resultReport = localReport;
 
-    const supabase = getSupabaseClient();
-    if (supabase) {
+    const db = getDatabaseClient();
+    if (db) {
       try {
         const sanitizedItems = sanitizeItemsForStorage(analysisResult.items || []);
-        const { data, error } = await (supabase.from('project_reports') as any)
+        const { data, error } = await (db.from('project_reports') as any)
           .insert([{
             project_id: projectId,
             project_name: projectName,
@@ -807,21 +505,21 @@ export const ReportHistoryStore = {
 
         if (error) {
           if (error.message && error.message.includes('timeout')) {
-            console.warn('⚠️ Supabase insert statement timeout. Report stored in active session memory fallback.');
+            console.warn('⚠️ Neon Database insert statement timeout. Report stored in active session memory fallback.');
           } else {
-            console.warn('⚠️ Supabase Report Insert Note:', error.message || error);
+            console.warn('⚠️ Database Report Insert Note:', error.message || error);
           }
         } else if (data && data.length > 0) {
-          console.log('✅ Successfully inserted report row to Supabase project_reports');
+          console.log('✅ Successfully inserted report row to Database project_reports');
           const dbReport = mapRowToHistoricalReport(data[0]);
           localReport.id = dbReport.id;
           resultReport = dbReport;
         }
       } catch (err: any) {
-        console.warn('⚠️ Supabase async exception during report insert (falling back to memory):', err?.message || err);
+        console.warn('⚠️ Database async exception during report insert (falling back to memory):', err?.message || err);
       }
     } else {
-      console.warn('⚠️ Supabase config not provided. Saved report in temporary session memory.');
+      console.warn('⚠️ Database config not provided. Saved report in temporary session memory.');
     }
 
     // 🚀 Cache in memory session
@@ -846,8 +544,8 @@ export const ReportHistoryStore = {
       const totalKm = analysisResult.totalLengthKm || (analysisResult.totalLengthMeters ? Number((analysisResult.totalLengthMeters / 1000).toFixed(3)) : 0);
       const notifMsg = `📊 تم تحليل وإصدار تقرير جديد لمشروع (${projectName}) - إجمالي الأطوال: ${totalKm} كم (${analysisResult.totalFeaturesCount || 0} عنصر)`;
       
-      if (supabase) {
-        await supabase.from('notifications').insert([{
+      if (db) {
+        await db.from('notifications').insert([{
           user_id: 'all',
           project_id: projectId,
           project_name: projectName,
@@ -897,8 +595,8 @@ export const ReportHistoryStore = {
 
     memoryChangelogs.unshift(localRecord);
 
-    const supabase = getSupabaseClient();
-    if (supabase) {
+    const db = getDatabaseClient();
+    if (db) {
       try {
         const insertPayload: any = {
           project_id: projectId,
@@ -914,7 +612,7 @@ export const ReportHistoryStore = {
           insertPayload.previous_report_id = previousReportId;
         }
 
-        const { data, error } = await (supabase.from('project_changelogs') as any)
+        const { data, error } = await (db.from('project_changelogs') as any)
           .insert([insertPayload])
           .select();
 
@@ -931,7 +629,7 @@ export const ReportHistoryStore = {
             const diffDetailsStr = parts.length > 0 ? ` (${parts.join('، ')})` : '';
             const notifMsg = `📢 تم رصد تحديثات وتغيرات جديدة بخريطة مشروع (${projectName})${diffDetailsStr}`;
 
-            await supabase.from('notifications').insert([{
+            await db.from('notifications').insert([{
               user_id: 'all',
               project_id: projectId,
               project_name: projectName,
@@ -961,15 +659,15 @@ export const ReportHistoryStore = {
         }
 
         if (error) {
-          console.warn('⚠️ Supabase Changelog Insert Note:', error.message || error);
+          console.warn('⚠️ Database Changelog Insert Note:', error.message || error);
         } else if (data && data.length > 0) {
-          console.log('✅ Successfully inserted changelog row to Supabase project_changelogs');
+          console.log('✅ Successfully inserted changelog row to Database project_changelogs');
           const dbRecord = mapRowToChangelogRecord(data[0]);
           localRecord.id = dbRecord.id;
           return dbRecord;
         }
       } catch (err: any) {
-        console.warn('⚠️ Supabase async exception in saveChangelog (falling back to memory):', err?.message || err);
+        console.warn('⚠️ Database async exception in saveChangelog (falling back to memory):', err?.message || err);
       }
     }
 
@@ -977,10 +675,10 @@ export const ReportHistoryStore = {
   },
 
   async getChangelogs(projectId?: number, projectName?: string): Promise<ProjectChangelogRecord[]> {
-    const supabase = getSupabaseClient();
-    if (supabase) {
+    const db = getDatabaseClient();
+    if (db) {
       try {
-        let query = (supabase.from('project_changelogs') as any)
+        let query = (db.from('project_changelogs') as any)
           .select('id, project_id, project_name, report_id, previous_report_id, diff, created_at, is_viewed')
           .order('created_at', { ascending: false })
           .limit(30);
@@ -990,7 +688,7 @@ export const ReportHistoryStore = {
         }
         let { data, error } = await query;
         if ((!data || data.length === 0) && projectName) {
-          const fallback = await (supabase.from('project_changelogs') as any)
+          const fallback = await (db.from('project_changelogs') as any)
             .select('id, project_id, project_name, report_id, previous_report_id, diff, created_at, is_viewed')
             .eq('project_name', projectName)
             .order('created_at', { ascending: false })
@@ -1004,10 +702,10 @@ export const ReportHistoryStore = {
           return data.map(mapRowToChangelogRecord);
         }
         if (error) {
-          console.warn('⚠️ Supabase getChangelogs Note:', error.message || error);
+          console.warn('⚠️ Database getChangelogs Note:', error.message || error);
         }
       } catch (err: any) {
-        console.warn('⚠️ Supabase getChangelogs exception (falling back to memory):', err?.message || err);
+        console.warn('⚠️ Database getChangelogs exception (falling back to memory):', err?.message || err);
       }
     }
 

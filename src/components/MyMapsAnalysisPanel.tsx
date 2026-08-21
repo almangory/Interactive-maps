@@ -19,7 +19,7 @@ import {
   isYellowItemWithoutPermit
 } from '../utils/myMapsKmlParser';
 import { compareKMLAnalyses } from '../utils/diffEngine';
-import { ReportHistoryStore, getSupabaseClient } from '../utils/supabaseSetup';
+import { ReportHistoryStore, getDatabaseClient } from '../utils/reportsStore';
 import { ProjectDiffModal } from './ProjectDiffModal';
 import { 
   runSequentialDailyAutoAnalysis, 
@@ -425,10 +425,10 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
         window.dispatchEvent(new Event('water_maps_notifications_updated'));
       } catch (e) {}
 
-      const supabase = getSupabaseClient();
-      if (supabase) {
+      const db = getDatabaseClient();
+      if (db) {
         try {
-          await supabase.from('notifications').insert([{
+          await db.from('notifications').insert([{
             user_id: 'all',
             project_id: proj.id,
             project_name: proj.name,
@@ -439,7 +439,7 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
             created_at: new Date().toISOString()
           }]);
         } catch (notifErr) {
-          console.error('Failed to insert notification into Supabase from analysis panel:', notifErr);
+          console.error('Failed to insert notification into Database from analysis panel:', notifErr);
         }
       }
     } else {
@@ -2372,9 +2372,6 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      )}
 
       {/* Previous Project Reports Section */}
       {activeProject && (

@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Project, StatusCategory, KMLAnalysisResult, HistoricalReport } from '../types';
-import { ReportHistoryStore, extractPoDigits, isReportMatchingProject, findReportForProject } from '../utils/supabaseSetup';
+import { ReportHistoryStore, extractPoDigits, isReportMatchingProject, findReportForProject } from '../utils/reportsStore';
 import { DashboardMetricsStore, DashboardProjectMetric } from '../utils/dashboardMetricsStore';
 import { generateSyntheticProjectKMLData, getStatusCategoryLabel, isValidIdentifier, cleanSegmentId, cleanPermitNo, cleanStage, isYellowItemWithoutPermit } from '../utils/myMapsKmlParser';
 import { YellowNoPermitModal, YellowNoPermitItemDetail } from './YellowNoPermitModal';
@@ -114,7 +114,7 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
     return undefined;
   };
 
-  // Load latest reports and dashboard metrics for all projects from Supabase / dedicated store
+  // Load latest reports and dashboard metrics for all projects from Database / dedicated store
   const loadReportsAndMetrics = async () => {
     setIsLoading(true);
     try {
@@ -1259,7 +1259,7 @@ export function ProjectLengthsDashboard({ projects, onSelectProject, onOpenMyMap
               className="px-3.5 py-2 bg-indigo-800/80 hover:bg-indigo-700 text-white font-black text-xs rounded-xl border border-indigo-600/50 shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
             >
               <RefreshCw className={`h-4 w-4 text-cyan-300 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>{t('lengths.syncSupabase')}</span>
+              <span>{t('lengths.syncNeon Database')}</span>
             </button>
             <button
               type="button"

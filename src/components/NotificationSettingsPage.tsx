@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Project } from '../types';
 import { useLanguage } from '../utils/i18n';
-import { getSupabaseClient } from '../utils/supabaseSetup';
+import { getDatabaseClient } from '../utils/reportsStore';
 import { 
   Bell, 
   Sliders, 
@@ -122,14 +122,14 @@ export function NotificationSettingsPage({
 
   const handleSendBroadcastTestNotif = async () => {
     setIsSendingTestNotif(true);
-    const supabase = getSupabaseClient();
+    const db = getDatabaseClient();
     const testMsg = language === 'en'
       ? `📢 General test broadcast from (${currentUser.name}): Project change notification pipeline operational for all engineers.`
       : `📢 إشعار تجريبي عام من المهندس (${currentUser.name}): تم التأكد من إتاحة استلام التغيرات لجميع مهندسي ومدراء النظام بنجاح!`;
     
     try {
-      if (supabase) {
-        await supabase.from('notifications').insert([{
+      if (db) {
+        await db.from('notifications').insert([{
           user_id: 'all',
           project_id: projects[0]?.id || 1,
           project_name: projects[0]?.name || (language === 'en' ? 'General Project' : 'مشروع عام'),

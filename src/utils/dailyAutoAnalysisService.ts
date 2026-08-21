@@ -1,7 +1,7 @@
 import { Project } from '../types';
 import { handleLoadMyMapsLink } from './myMapsKmlParser';
 import { compareKMLAnalyses } from './diffEngine';
-import { ReportHistoryStore, getSupabaseClient } from './supabaseSetup';
+import { ReportHistoryStore, getDatabaseClient } from './reportsStore';
 
 export interface AutoAnalysisProgress {
   isRunning: boolean;
@@ -131,7 +131,7 @@ export async function runSequentialDailyAutoAnalysis(
   let processedCount = 0;
   let changesCount = 0;
 
-  const supabase = getSupabaseClient();
+  const db = getDatabaseClient();
 
   for (const proj of eligibleProjects) {
     if (cancelRequested) {
@@ -168,7 +168,7 @@ export async function runSequentialDailyAutoAnalysis(
           proj.scope
         );
 
-        // 3. Save report & changelog in Supabase / memory
+        // 3. Save report & changelog in Database / memory
         const savedReport = await ReportHistoryStore.saveReport(
           proj.id,
           proj.name,
@@ -184,7 +184,7 @@ export async function runSequentialDailyAutoAnalysis(
           diff
         );
 
-        // 4. If changes are found, insert notification into Supabase & notify local state
+        // 4. If changes are found, insert notification into Database & notify local state
         if (diff.hasChanges) {
           changesCount++;
           currentProgress.changesFoundCount++;
@@ -227,9 +227,9 @@ export async function runSequentialDailyAutoAnalysis(
             created_at: new Date().toISOString()
           };
 
-          if (supabase) {
+          if (db) {
             try {
-              const { data: insertedNotifs } = await supabase
+              const { data: insertedNotifs } = await db
                 .from('notifications')
                 .insert([notifPayload])
                 .select();
@@ -249,7 +249,7 @@ export async function runSequentialDailyAutoAnalysis(
                 };
               }
             } catch (notifErr) {
-              console.error('Failed to insert notification into Supabase:', notifErr);
+              console.error('Failed to insert notification into Database:', notifErr);
             }
           }
 

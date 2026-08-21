@@ -22,11 +22,11 @@ import {
   Tag,
   Plus,
   Edit3,
-  Map as MapIcon,
+  Map,
   Activity
 } from 'lucide-react';
 import { Project, User as UserType } from '../types';
-import { getSupabaseClient } from '../utils/supabaseSetup';
+import { getDatabaseClient } from '../utils/reportsStore';
 import { useLanguage } from '../utils/i18n';
 
 export interface FieldChange {
@@ -76,7 +76,7 @@ export const ChangelogTab: React.FC<ChangelogTabProps> = ({
   const [selectedUser, setSelectedUser] = useState<string>('all');
   const [expandedLogIds, setExpandedLogIds] = useState<Record<string, boolean>>({});
 
-  // 1. جلب بيانات سجل التغييرات من قاعدة بيانات Supabase والذاكرة المحلية
+  // 1. جلب بيانات سجل التغييرات من قاعدة بيانات Neon Database والذاكرة المحلية
   const fetchChangelogs = async () => {
     setLoading(true);
     const combinedLogs: ChangelogItem[] = [];
@@ -94,11 +94,11 @@ export const ChangelogTab: React.FC<ChangelogTabProps> = ({
       console.warn('Error reading local changelogs:', e);
     }
 
-    // ب) جلب السجلات من Supabase table project_changelogs
-    const supabase = getSupabaseClient();
-    if (supabase) {
+    // ب) جلب السجلات من Database table project_changelogs
+    const db = getDatabaseClient();
+    if (db) {
       try {
-        const { data, error } = await (supabase.from('project_changelogs') as any)
+        const { data, error } = await (db.from('project_changelogs') as any)
           .select('*')
           .order('created_at', { ascending: false });
 
@@ -134,7 +134,7 @@ export const ChangelogTab: React.FC<ChangelogTabProps> = ({
 
       // جـ) تحويل الإشعارات المخزنة في notifications إلى سجلات إضافية للتغطية الشاملة
       try {
-        const { data: notifData } = await (supabase.from('notifications') as any)
+        const { data: notifData } = await (db.from('notifications') as any)
           .select('*')
           .order('created_at', { ascending: false });
 
@@ -436,7 +436,7 @@ export const ChangelogTab: React.FC<ChangelogTabProps> = ({
                     {log.changeType === 'add' ? (
                       <Plus className="h-4 w-4" />
                     ) : log.changeType === 'map_update' ? (
-                      <MapIcon className="h-4 w-4" />
+                      <Map className="h-4 w-4" />
                     ) : (
                       <Edit3 className="h-4 w-4" />
                     )}

@@ -8,9 +8,9 @@ import { Project, User, AppNotification } from './types';
 import { getParsedProjects } from './data/initialProjects';
 import { INITIAL_USERS } from './data/initialUsers';
 
-// استيراد عميل سوبابيس
-import { supabase } from './supabase';
-import { getSupabaseClient } from './utils/supabaseSetup';
+// استيراد عميل قاعدة البيانات
+import { db } from './db';
+import { getDatabaseClient } from './utils/reportsStore';
 
 // Components
 import { DashboardStats } from './components/DashboardStats';
@@ -498,13 +498,13 @@ export default function App() {
       // 🚀 Explicit column projection to reduce Egress Bandwidth
       const PROJECT_COLUMNS = 'id, operational_number, name, po, unifier_no, contractor, consultant, status, scope, classification, business_unit, region, sub_program, map_url, x, y, surveyor_name, surveyor_phone, created_at';
 
-      const res1 = await supabase
+      const res1 = await db
         .from('projects')
         .select(PROJECT_COLUMNS)
         .order('created_at', { ascending: false });
 
       if (res1.error) {
-        const res2 = await supabase.from('projects').select(PROJECT_COLUMNS);
+        const res2 = await db.from('projects').select(PROJECT_COLUMNS);
         dbProjects = res2.data;
         projError = res2.error;
       } else {
@@ -551,7 +551,7 @@ export default function App() {
 
       // لا يتم جلب جدول المستخدمين إلا إذا كان المستخدم الحالي مديراً للنظام لضمان الخصوصية والأمان التام
       if (activeUser && activeUser.role === 'admin') {
-        const { data: dbUsers, error: userError } = await supabase
+        const { data: dbUsers, error: userError } = await db
           .from('users')
           .select('*');
 
@@ -661,7 +661,7 @@ export default function App() {
     })()
   );
 
-  // 🔄 المزامنة الحية لِـسحب الإشعارات وسجلات التغيرات من سوبابيس والتخزين المحلي وتمرير الأحداث الدقيقة
+  // 🔄 المزامنة الحية لِـسحب الإشعارات وسجلات التغيرات من قاعدة البيانات والتخزين المحلي وتمرير الأحداث الدقيقة
   useEffect(() => {
     const fetchUserNotifications = async () => {
       if (!currentUser || !currentUser.id || !isLogged) return;
@@ -669,7 +669,7 @@ export default function App() {
       try {
         let fetchedData: any[] = [];
         let changelogData: any[] = [];
-        const client = getSupabaseClient() || supabase;
+        const client = getDatabaseClient() || db;
 
         if (client) {
           try {
@@ -683,7 +683,7 @@ export default function App() {
               fetchedData = data;
             }
           } catch (e) {
-            console.warn('Supabase notifications fetch error:', e);
+            console.warn('Neon Database notifications fetch error:', e);
           }
 
           try {
@@ -696,7 +696,7 @@ export default function App() {
               changelogData = cData;
             }
           } catch (e) {
-            console.warn('Supabase project_changelogs fetch error:', e);
+            console.warn('Neon Database project_changelogs fetch error:', e);
           }
         }
 
@@ -836,16 +836,16 @@ export default function App() {
     };
 
     fetchUserNotifications();
-    // تقليل التكرار المفرط لمنع استهلاك Vercel Edge Requests: المزامنة تتم فورياً عبر Supabase Realtime وأحداث النافذة
+    // تقليل التكرار المفرط لمنع استهلاك Vercel Edge Requests: المزامنة تتم فورياً عبر Neon Database Realtime وأحداث النافذة
     const interval = setInterval(fetchUserNotifications, 300000); // كل 5 دقائق كفحص احتياطي نادراً بدلاً من كل 12 ثانية
 
     // تحديث الإشعارات عند عودة المستخدم إلى تبويب التطبيق
     const handleWindowFocus = () => fetchUserNotifications();
     window.addEventListener('focus', handleWindowFocus);
 
-    // الاشتراك المباشر عبر Supabase Realtime لإرسال الإشعارات لحظياً لجميع الأجهزة
+    // الاشتراك المباشر عبر Neon Database Realtime لإرسال الإشعارات لحظياً لجميع الأجهزة
     let realtimeChannel: any = null;
-    const client = getSupabaseClient() || supabase;
+    const client = getDatabaseClient() || db;
     if (client && typeof client.channel === 'function') {
       try {
         realtimeChannel = client
@@ -858,7 +858,7 @@ export default function App() {
           })
           .subscribe();
       } catch (e) {
-        console.warn('Supabase Realtime subscription warning:', e);
+        console.warn('Neon Database Realtime subscription warning:', e);
       }
     }
 
@@ -1108,7 +1108,7 @@ export default function App() {
     
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('users')
         .select('*')
         .eq('username', prefix);
@@ -1198,7 +1198,7 @@ export default function App() {
     try {
       let data: any[] | null = null;
 
-      const res = await supabase
+      const res = await db
         .from('users')
         .select('*')
         .or('role.eq.admin,username.eq.admin');
@@ -1206,7 +1206,7 @@ export default function App() {
       if (!res.error && res.data && res.data.length > 0) {
         data = res.data;
       } else {
-        const allRes = await supabase.from('users').select('*');
+        const allRes = await db.from('users').select('*');
         if (allRes.data) {
           data = allRes.data.filter((u: any) => u.role === 'admin' || u.username === 'admin');
         }
@@ -1250,7 +1250,7 @@ export default function App() {
         };
 
         try {
-          await supabase.from('users').insert([newAdminUser]);
+          await db.from('users').insert([newAdminUser]);
         } catch (insertErr) {
           console.warn("تعذر إضافة مدير النظام تلقائياً لقاعدة البيانات:", insertErr);
         }
@@ -1394,14 +1394,14 @@ export default function App() {
     };
 
     try {
-      await supabase.from('project_changelogs').insert([{
+      await db.from('project_changelogs').insert([{
         project_id: savedProj.id,
         project_name: savedProj.name,
         diff: changelogPayload,
         created_at: new Date().toISOString()
       }]);
     } catch (clErr) {
-      console.warn("تعذر حفظ سجل التغييرات في سوبابيس:", clErr);
+      console.warn("تعذر حفظ سجل التغييرات في قاعدة البيانات:", clErr);
     }
 
     try {
@@ -1415,14 +1415,14 @@ export default function App() {
     try {
       if (exists) {
         // 2️⃣ الرفع طوالي لقاعدة البيانات
-        let { error } = await supabase.from('projects').update(payload).eq('id', savedProj.id);
+        let { error } = await db.from('projects').update(payload).eq('id', savedProj.id);
         
-        // إذا لم تكن الأعمدة surveyor_name / surveyor_phone مضافة بعد في جدول Supabase
+        // إذا لم تكن الأعمدة surveyor_name / surveyor_phone مضافة بعد في جدول Neon Database
         if (error && (error.code === '42703' || error.message.includes('surveyor_name') || error.message.includes('surveyor_phone'))) {
           const fallbackPayload = { ...payload };
           delete fallbackPayload.surveyor_name;
           delete fallbackPayload.surveyor_phone;
-          const retryRes = await supabase.from('projects').update(fallbackPayload).eq('id', savedProj.id);
+          const retryRes = await db.from('projects').update(fallbackPayload).eq('id', savedProj.id);
           error = retryRes.error;
         }
 
@@ -1433,7 +1433,7 @@ export default function App() {
           sendNativeNotification('تعديل مشروع 💾', dynamicDiffMsg);
 
           // إدخال سطر الإشعار الحامِل لِلاسم والحدث الدقيق ليتوزع وراء الستار للباقيين
-          await supabase.from('notifications').insert([{
+          await db.from('notifications').insert([{
             user_id: 'all',
             project_id: savedProj.id,
             project_name: savedProj.name,
@@ -1444,14 +1444,14 @@ export default function App() {
           }]);
         }
       } else {
-        let { data: insertedData, error } = await supabase.from('projects').insert([payload]).select();
+        let { data: insertedData, error } = await db.from('projects').insert([payload]).select();
         
-        // إذا لم تكن الأعمدة مضافة بعد في Supabase
+        // إذا لم تكن الأعمدة مضافة بعد في Neon Database
         if (error && (error.code === '42703' || error.message.includes('surveyor_name') || error.message.includes('surveyor_phone'))) {
           const fallbackPayload = { ...payload };
           delete fallbackPayload.surveyor_name;
           delete fallbackPayload.surveyor_phone;
-          const retryRes = await supabase.from('projects').insert([fallbackPayload]).select();
+          const retryRes = await db.from('projects').insert([fallbackPayload]).select();
           insertedData = retryRes.data;
           error = retryRes.error;
         }
@@ -1461,7 +1461,7 @@ export default function App() {
           
           sendNativeNotification('إضافة مشروع جديد 🚀', `تم إدراج خارطة مشروع جديد بنجاح: ${savedProj.name}`);
 
-          await supabase.from('notifications').insert([{
+          await db.from('notifications').insert([{
             user_id: 'all',
             project_id: insertedData[0].id,
             project_name: savedProj.name,
@@ -1486,7 +1486,7 @@ export default function App() {
       }
     });
 
-    fetchDataFromSupabase();
+    fetchDataFromNeon Database();
   };
 
   const handleStartAddNewProject = () => {
@@ -1540,8 +1540,8 @@ export default function App() {
     const exists = users.some(u => u.id === updatedUser.id);
     try {
       let { error } = exists
-        ? await supabase.from('users').update(payload).eq('id', updatedUser.id)
-        : await supabase.from('users').insert([{ id: updatedUser.id, ...payload }]);
+        ? await db.from('users').update(payload).eq('id', updatedUser.id)
+        : await db.from('users').insert([{ id: updatedUser.id, ...payload }]);
 
       if (error) {
         console.warn("تعذر إضافة الأعمدة المتقدمة في قاعدة البيانات، جاري الحفظ بالأعمدة الأساسية:", error.message);
@@ -1554,8 +1554,8 @@ export default function App() {
           password: updatedUser.password || 'nwc1234'
         };
         await (exists
-          ? supabase.from('users').update(fallbackPayload).eq('id', updatedUser.id)
-          : supabase.from('users').insert([{ id: updatedUser.id, ...fallbackPayload }]));
+          ? db.from('users').update(fallbackPayload).eq('id', updatedUser.id)
+          : db.from('users').insert([{ id: updatedUser.id, ...fallbackPayload }]));
       }
     } catch (err: any) {
       console.error(err);
@@ -1565,7 +1565,7 @@ export default function App() {
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      await supabase.from('users').delete().eq('id', userId);
+      await db.from('users').delete().eq('id', userId);
     } catch (err: any) {
       console.error(err);
     }
