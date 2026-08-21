@@ -162,11 +162,13 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
     if (!analysisResult || !analysisResult.items) return;
     let fixedCount = 0;
     const updatedItems = analysisResult.items.map(it => {
-      const check = checkColorCompliance(it.color || '');
+      const check = checkColorCompliance(it.originalColorHex || it.colorHex || it.color || '');
       if (!check.isCompliant) {
         fixedCount++;
         return {
           ...it,
+          colorHex: check.suggestedApprovedColor,
+          originalColorHex: check.suggestedApprovedColor,
           color: check.suggestedApprovedColor,
           statusCategory: check.matchedCategory.key === 'executed_water' ? 'executed_water' :
                           check.matchedCategory.key === 'executed_sewer' ? 'executed_sewage' :
@@ -2344,12 +2346,13 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                       onClick={() => {
                         if (!analysisResult) return;
                         const rows = analysisResult.items.map((it, idx) => {
-                          const check = checkColorCompliance(it.color || '');
+                          const actualColor = it.originalColorHex || it.colorHex || it.color || '';
+                          const check = checkColorCompliance(actualColor);
                           return {
                             'م': idx + 1,
                             'معرف القطاع (Segment ID)': it.segmentId || 'غير محدد',
                             'رقم الفسح (Permit No)': it.permitNo || 'غير محدد',
-                            'كود اللون الفعلي': it.color || 'غير محدد',
+                            'كود اللون الفعلي': actualColor || 'غير محدد',
                             'هل اللون مطابق للمواصفات؟': check.isCompliant ? 'مطابق ✅' : 'مخالف ❌',
                             'التصنيف المعتمد المقترح': check.matchedCategory.nameAr,
                             'كود اللون المعتمد': check.suggestedApprovedColor,
@@ -2472,6 +2475,8 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                                       if (stat.itemIds.includes(it.id)) {
                                         return {
                                           ...it,
+                                          colorHex: stat.suggestedColor,
+                                          originalColorHex: stat.suggestedColor,
                                           color: stat.suggestedColor
                                         };
                                       }

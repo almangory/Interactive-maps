@@ -1357,13 +1357,16 @@ export function parseKMLContent(xmlString: string, projectName: string = 'مشر
     const statusLabel = getStatusCategoryLabel(category, projectName, projectScope);
 
     let itemStage = cleanStage(extractedStage);
+    const rawActualColor = hexColor || assignedConfig.hex;
 
     items.push({
       id: `feature-${idx + 1}`,
       name,
       segmentId,
       permitNo,
-      colorHex: assignedConfig.hex,
+      colorHex: rawActualColor,
+      originalColorHex: rawActualColor,
+      color: rawActualColor,
       statusCategory: category,
       statusLabel,
       lengthMeters: Math.round(finalLengthMeters),

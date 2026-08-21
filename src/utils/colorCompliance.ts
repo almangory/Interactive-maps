@@ -140,11 +140,13 @@ export interface NonCompliantColorSummary {
 /**
  * Scans all items in a KML analysis result and aggregates all non-compliant color segments.
  */
-export const auditNonCompliantColors = (items: Array<{ id: string; color?: string; lengthMeters?: number }>): NonCompliantColorSummary[] => {
+export const auditNonCompliantColors = (items: Array<any>): NonCompliantColorSummary[] => {
   const map: Record<string, NonCompliantColorSummary> = {};
 
-  items.forEach(item => {
-    const hex = item.color || '#A52714';
+  (items || []).forEach(item => {
+    if (!item) return;
+    const hex = item.originalColorHex || item.colorHex || item.color || '';
+    if (!hex) return;
     const check = checkColorCompliance(hex);
     if (!check.isCompliant) {
       const normalizedHex = normalizeHexToRgbHex(hex);

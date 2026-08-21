@@ -79,6 +79,8 @@ export interface KMLFeatureItem {
   segmentId: string;
   permitNo: string;
   colorHex: string; // #01579B, #097138, #ffea00, #a52714, #F48FB1
+  originalColorHex?: string; // Exact raw hex color from KML file before mapping
+  color?: string; // Compatibility alias
   statusCategory: StatusCategory;
   statusLabel: string; // منفذ - مياه | منفذ - صرف | جاري العمل | أعمال متبقية | خطوط تم إلغائها
   lengthMeters: number;
