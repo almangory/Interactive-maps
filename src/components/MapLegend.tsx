@@ -8,7 +8,7 @@ import { KMLAnalysisResult, StatusCategory } from '../types';
 import { COLOR_CONFIG, getStatusCategoryLabel } from '../utils/myMapsKmlParser';
 import { exportAnalysisToPDF } from '../utils/pdfExport';
 import { useLanguage } from '../utils/i18n';
-import { Key, Sparkles, ChevronDown, ChevronUp, Layers, Ruler, RefreshCw, Download } from 'lucide-react';
+import { Key, Sparkles, ChevronDown, ChevronUp, Layers, Ruler, RefreshCw, Download, X } from 'lucide-react';
 
 interface MapLegendProps {
   analysisResult?: KMLAnalysisResult | null;
@@ -19,6 +19,7 @@ interface MapLegendProps {
   isCollapsible?: boolean;
   defaultExpanded?: boolean;
   compact?: boolean;
+  onClose?: () => void;
 }
 
 export const MapLegend: React.FC<MapLegendProps> = ({
@@ -29,7 +30,8 @@ export const MapLegend: React.FC<MapLegendProps> = ({
   className = '',
   isCollapsible = true,
   defaultExpanded = true,
-  compact = false
+  compact = false,
+  onClose
 }) => {
   const { t, isRtl, formatNumber, translateDynamic, language } = useLanguage();
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
@@ -126,8 +128,23 @@ export const MapLegend: React.FC<MapLegendProps> = ({
             <button
               type="button"
               className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title={isExpanded ? 'تصغير' : 'توسيع'}
             >
               {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          )}
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-1 text-rose-500 hover:text-white hover:bg-rose-600 rounded-lg transition-all cursor-pointer font-bold shrink-0"
+              title="إغلاق مفاتيح الخريطة"
+            >
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -135,7 +152,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="p-3.5 space-y-3">
+        <div className="p-3.5 space-y-2.5 max-h-[min(65vh,420px)] overflow-y-auto">
           {/* Active Analysis Total Badge */}
           {analysisResult ? (
             <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between text-xs">

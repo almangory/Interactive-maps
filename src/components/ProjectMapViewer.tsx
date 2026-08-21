@@ -20,6 +20,7 @@ import { KMLAnalysisResult } from '../types';
 import { handleLoadMyMapsLink, generateSyntheticProjectKMLData } from '../utils/myMapsKmlParser';
 import { useLanguage } from '../utils/i18n';
 import { 
+  Map, 
   Maximize2, 
   Minimize2, 
   Shield, 
@@ -1225,7 +1226,7 @@ export function ProjectMapViewer({
 
         {/* Floating map classification legend block */}
         {isLeafletReady && mapMode === 'osm' && (
-          <div className="absolute bottom-4 left-4 z-[999] max-w-[320px] sm:max-w-[400px]" dir={isRtl ? 'rtl' : 'ltr'}>
+          <div className={`absolute bottom-3 ${isRtl ? 'right-3' : 'left-3'} z-[999] max-w-[calc(100%-24px)] sm:max-w-[380px] max-h-[85%]`} dir={isRtl ? 'rtl' : 'ltr'}>
             {!isLegendExpanded ? (
               <button
                 type="button"
@@ -1236,7 +1237,7 @@ export function ProjectMapViewer({
                   }
                 }}
                 title={t('legend.title')}
-                className="px-3.5 py-2.5 rounded-xl bg-white/95 dark:bg-slate-900/95 hover:bg-white dark:hover:bg-slate-900 border border-slate-200/85 dark:border-slate-800 shadow-2xl flex items-center gap-2 text-blue-600 dark:text-blue-400 transition-all active:scale-95 hover:scale-105 cursor-pointer font-extrabold text-xs"
+                className="px-3.5 py-2 rounded-xl bg-white/95 dark:bg-slate-900/95 hover:bg-white dark:hover:bg-slate-900 border border-slate-200/85 dark:border-slate-800 shadow-xl flex items-center gap-2 text-blue-600 dark:text-blue-400 transition-all active:scale-95 hover:scale-105 cursor-pointer font-extrabold text-xs"
               >
                 <Key className="h-4 w-4 text-amber-500 animate-pulse" />
                 <span>{t('map.legendButton')}</span>
@@ -1255,6 +1256,7 @@ export function ProjectMapViewer({
                 compact={true}
                 isCollapsible={true}
                 defaultExpanded={true}
+                onClose={() => setIsLegendExpanded(false)}
               />
             )}
           </div>
