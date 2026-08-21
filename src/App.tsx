@@ -1486,7 +1486,7 @@ export default function App() {
       }
     });
 
-    fetchDataFromNeon Database();
+    fetchDataFromDatabase();
   };
 
   const handleStartAddNewProject = () => {
