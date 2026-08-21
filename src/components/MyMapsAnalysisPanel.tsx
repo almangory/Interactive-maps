@@ -157,102 +157,6 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
     return auditNonCompliantColors(analysisResult.items);
   }, [analysisResult]);
 
-  // Handler for Auto-fixing non-compliant colors
-  const handleAutoFixNonCompliantColors = () => {
-    if (!analysisResult || !analysisResult.items) return;
-    let fixedCount = 0;
-    const updatedItems = analysisResult.items.map(it => {
-      const check = checkColorCompliance(it.originalColorHex || it.colorHex || it.color || '');
-      if (!check.isCompliant) {
-        fixedCount++;
-        return {
-          ...it,
-          colorHex: check.suggestedApprovedColor,
-          originalColorHex: check.suggestedApprovedColor,
-          color: check.suggestedApprovedColor,
-          statusCategory: check.matchedCategory.key === 'executed_water' ? 'executed_water' :
-                          check.matchedCategory.key === 'executed_sewer' ? 'executed_sewage' :
-                          check.matchedCategory.key === 'in_progress' ? 'ongoing' :
-                          check.matchedCategory.key === 'remaining' ? 'remaining' : 'cancelled'
-        };
-      }
-      return it;
-    });
-
-    const updatedResult: KMLAnalysisResult = {
-      ...analysisResult,
-      items: updatedItems
-    };
-    setAnalysisResult(updatedResult);
-    if (activeProject) {
-      ReportHistoryStore.saveReport(activeProject.id, activeProject.name, activeProject.mapUrl, updatedResult).catch(() => {});
-    }
-    setFeedbackMessage(`🎨 تم بنجاح تصحيح ومطابقة (${fixedCount}) عنصر ملون مخالف لأكواد شركة المياه الوطنية المعتمدة!`);
-    setTimeout(() => setFeedbackMessage(''), 6000);
-  };
-
-  // Handlers for Attribute Formatter & Segment Vault Pipeline
-  const handleRunPermitInspection = () => {
-    if (!analysisResult) return;
-    const { updatedResult, filledPermitCount } = runAttributeFormatterPipeline(analysisResult);
-    setAnalysisResult(updatedResult);
-    if (activeProject) {
-      ReportHistoryStore.saveReport(activeProject.id, activeProject.name, activeProject.mapUrl, updatedResult).catch(() => {});
-    }
-    setFeedbackMessage(`📜 تم فحص وتعبئة تصاريح الحفر بنجاح! تم استخراج واستنتاج (${filledPermitCount}) رقم تصريح/فسح حفر عبر أنماط الرخص والمطابقة المكانية.`);
-    setTimeout(() => setFeedbackMessage(''), 6000);
-  };
-
-  const handleRunSegmentVault = () => {
-    if (!analysisResult) return;
-    const { updatedResult, filledSegmentCount, vaultClustersCount } = runAttributeFormatterPipeline(analysisResult);
-    setAnalysisResult(updatedResult);
-    if (activeProject) {
-      ReportHistoryStore.saveReport(activeProject.id, activeProject.name, activeProject.mapUrl, updatedResult).catch(() => {});
-    }
-    setFeedbackMessage(`⚙️ تم تأكيد وتوليد Segment ID بنجاح! تم تعيين (${filledSegmentCount}) رمز قطاع وتجميع (${vaultClustersCount}) تكتل في حافظة Segment Vault.`);
-    setTimeout(() => setFeedbackMessage(''), 6000);
-  };
-
-  const handleRunFullFormatterPipeline = () => {
-    if (!analysisResult) return;
-    const { updatedResult, filledPermitCount, filledSegmentCount, vaultClustersCount } = runAttributeFormatterPipeline(analysisResult);
-    setAnalysisResult(updatedResult);
-    if (activeProject) {
-      ReportHistoryStore.saveReport(activeProject.id, activeProject.name, activeProject.mapUrl, updatedResult).catch(() => {});
-    }
-    setFeedbackMessage(`⚡ تم تشغيل محرك التنسيق والتدقيق الكامل! تم ملء (${filledPermitCount}) تصريح حفر، وتعبئة/تأكيد (${filledSegmentCount}) Segment ID عبر حافظة Vault (${vaultClustersCount} تكتل هيدروليكي).`);
-    setTimeout(() => setFeedbackMessage(''), 7000);
-  };
-
-  const handleExportFormatterExcel = () => {
-    if (!analysisResult || !analysisResult.items) return;
-    const exportRows = analysisResult.items.map((it, idx) => ({
-      'م': idx + 1,
-      'Segment ID (معرف القطاع)': cleanSegmentId(it.segmentId) || 'غير محدد',
-      'Permit No (رقم تصريح الحفر)': cleanPermitNo(it.permitNo) || 'غير محدد',
-      'اسم القطاع / الخط': it.name || '-',
-      'حالة التنفيذ والبيان': it.statusLabel || '-',
-      'القطر الداخلي (مم)': it.innerDiameter || '-',
-      'اسم الشارع': it.streetName || '-',
-      'الحي / المنطقة': it.district || '-',
-      'طريقة الحفر': it.drillingType || '-',
-      'شركة المقاولات': it.contractor || '-',
-      'الطول (متر)': it.lengthMeters,
-      'الطول (كيلومتر)': it.lengthKm,
-      'الإحداثيات الجغرافية': (it.centerLat && it.centerLng) ? `${it.centerLat}, ${it.centerLng}` : '-'
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "جدول Segment و Permit");
-    const pName = activeProject?.name || analysisResult.projectName || 'مشروع_الخارطة';
-    const dateStr = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(wb, `تقرير_تصاريح_وقطاعات_${pName.replace(/\s+/g, '_')}_${dateStr}.xlsx`);
-    setFeedbackMessage('📊 تم تصدير التقرير النهائي بجدول إكسل يضم Segment ID و Permit No لجميع العناصر بنجاح!');
-    setTimeout(() => setFeedbackMessage(''), 5000);
-  };
-
   const handleUpdateItemSegmentOrPermit = (itemId: string, field: 'segmentId' | 'permitNo', value: string) => {
     if (!analysisResult) return;
     const cleanedValue = field === 'segmentId' ? cleanSegmentId(value) : cleanPermitNo(value);
@@ -1410,19 +1314,11 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={handleAutoFixNonCompliantColors}
-                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95 border border-emerald-400/30"
-                    title="مطابقة وتصحيح الألوان المخالفة تلقائياً بناءً على أقرب مسافة لونية"
-                  >
-                    <Wrench className="h-4 w-4" />
-                    <span>تصحيح ومطابقة الألوان تلقائياً ⚡</span>
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setActiveAnalysisTab('colors')}
                     className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow-lg shadow-amber-600/20 transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95 border border-amber-400/30"
                   >
-                    <span>فحص الألوان 🔍</span>
+                    <Palette className="h-4 w-4" />
+                    <span>فحص وتفاصيل الألوان 🎨</span>
                   </button>
                 </div>
               </div>
