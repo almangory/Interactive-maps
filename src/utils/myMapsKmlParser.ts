@@ -691,11 +691,12 @@ export function cleanPermitNo(val: any): string {
     return '';
   }
 
-  return str;
 }
 
 /**
- * Strict Extractionexport function extractStrictPermitNo(
+ * Strict Extraction of Permit No from Placemark elements, HTML description table rows, or structured text.
+ */
+export function extractStrictPermitNo(
   pm?: Element | null,
   rawDescription: string = '',
   descText: string = '',
