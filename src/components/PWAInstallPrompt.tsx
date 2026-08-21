@@ -59,7 +59,7 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
   const handleInstallClick = async () => {
     // If inside iframe, open in new top-level browser tab
     if (isInIframe()) {
-      window.open(window.location.href, '_blank');
+      window.open(window.location.href, '_blank', 'noopener,noreferrer');
       return;
     }
 
@@ -84,7 +84,7 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
     } else {
       // If promptEvent not ready, attempt fallback open or guide
       if (isInIframe()) {
-        window.open(window.location.href, '_blank');
+        window.open(window.location.href, '_blank', 'noopener,noreferrer');
       }
     }
   };

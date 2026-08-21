@@ -20,6 +20,7 @@ import { KMLAnalysisResult } from '../types';
 import { handleLoadMyMapsLink, generateSyntheticProjectKMLData } from '../utils/myMapsKmlParser';
 import { useLanguage } from '../utils/i18n';
 import { 
+  Map, 
   Maximize2, 
   Minimize2, 
   Shield, 
@@ -633,7 +634,7 @@ export function ProjectMapViewer({
           openMapsBtn.onclick = () => {
             if (mapUrl) {
               try {
-                window.open(mapUrl, '_blank');
+                window.open(mapUrl, '_blank', 'noopener,noreferrer');
               } catch (err) {
                 console.error("Popup window.open failed", err);
               }
