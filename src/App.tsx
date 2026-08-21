@@ -141,20 +141,11 @@ export const isProjectAllowedForUser = (p: Project, currentUser: User): boolean 
     return actualScope === uScope;
   });
 
-  const uLayers = (currentUser.allowedLayers || ['water', 'sewage', 'materials']).map(l => l.trim());
-  const isAllLayers = uLayers.includes('الكل') || (uLayers.includes('water') && uLayers.includes('sewage') && uLayers.includes('materials'));
-  
-  let isLayerAllowed = true;
-  if (!isAllLayers) {
-    const projLayer = actualScope === 'مياه' ? 'water' : actualScope === 'صرف صحي' ? 'sewage' : 'materials';
-    isLayerAllowed = uLayers.includes(projLayer);
-  }
-
   const uStatuses = (currentUser.allowedStatuses || ['الكل']).map(s => s.trim());
   const isAllStatuses = uStatuses.includes('الكل') || uStatuses.length === 0;
   const isStatusAllowed = isAllStatuses || uStatuses.some(st => (p.status || '').trim() === st);
 
-  return isRegionAllowed && isScopeAllowed && isLayerAllowed && isStatusAllowed;
+  return isRegionAllowed && isScopeAllowed && isStatusAllowed;
 };
 
 export const getProjectDifferencesMessage = (oldP: Project, newP: Project): string => {
@@ -599,6 +590,12 @@ export default function App() {
               else { try { allowedLayers = JSON.parse(u.allowed_layers); } catch (e) { allowedLayers = [u.allowed_layers]; } }
             }
 
+            let allowedStatsSubTabs: string[] = existingLocal?.allowedStatsSubTabs || ['lengths', 'mymaps', 'general'];
+            if (u.allowed_stats_sub_tabs !== undefined && u.allowed_stats_sub_tabs !== null) {
+              if (Array.isArray(u.allowed_stats_sub_tabs)) { allowedStatsSubTabs = u.allowed_stats_sub_tabs; }
+              else { try { allowedStatsSubTabs = JSON.parse(u.allowed_stats_sub_tabs); } catch (e) { } }
+            }
+
             let allowedProjectIds: number[] = existingLocal?.allowedProjectIds || [];
             if (u.allowed_project_ids !== undefined && u.allowed_project_ids !== null) {
               if (Array.isArray(u.allowed_project_ids)) { allowedProjectIds = u.allowed_project_ids.map(Number); } 
@@ -621,6 +618,7 @@ export default function App() {
               password: u.password,
               allowedTabs: allowedTabs,
               allowedLayers: allowedLayers,
+              allowedStatsSubTabs: allowedStatsSubTabs,
               canOpenExternalLinks: u.can_open_external_links !== undefined && u.can_open_external_links !== null
                 ? u.can_open_external_links !== false
                 : (existingLocal?.canOpenExternalLinks !== false),
@@ -1171,6 +1169,11 @@ export default function App() {
         if (Array.isArray(found.allowed_layers)) { allowedLayers = found.allowed_layers; } 
         else { try { allowedLayers = JSON.parse(found.allowed_layers); } catch (e) { allowedLayers = [found.allowed_layers]; } }
       }
+      let allowedStatsSubTabs: string[] = ['lengths', 'mymaps', 'general'];
+      if (found.allowed_stats_sub_tabs) {
+        if (Array.isArray(found.allowed_stats_sub_tabs)) { allowedStatsSubTabs = found.allowed_stats_sub_tabs; }
+        else { try { allowedStatsSubTabs = JSON.parse(found.allowed_stats_sub_tabs); } catch (e) { } }
+      }
       let allowedProjectIds: number[] = [];
       if (found.allowed_project_ids) {
         if (Array.isArray(found.allowed_project_ids)) { allowedProjectIds = found.allowed_project_ids.map(Number); } 
@@ -1192,6 +1195,7 @@ export default function App() {
         password: found.password,
         allowedTabs: allowedTabs,
         allowedLayers: allowedLayers,
+        allowedStatsSubTabs: allowedStatsSubTabs,
         canOpenExternalLinks: found.can_open_external_links !== false,
         canFilter: found.can_filter !== false,
         canInsert: found.can_insert !== false,
@@ -1566,6 +1570,7 @@ export default function App() {
       password: updatedUser.password || 'nwc1234',
       allowed_tabs: updatedUser.allowedTabs || ['maps', 'stats', 'layers'],
       allowed_layers: updatedUser.allowedLayers || ['water', 'sewage', 'materials'],
+      allowed_stats_sub_tabs: updatedUser.allowedStatsSubTabs || ['lengths', 'mymaps', 'general'],
       can_open_external_links: updatedUser.canOpenExternalLinks !== false,
       can_filter: updatedUser.canFilter !== false,
       can_insert: updatedUser.canInsert !== false,

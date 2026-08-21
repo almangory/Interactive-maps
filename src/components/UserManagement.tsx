@@ -512,6 +512,13 @@ export function UserManagement({
       return;
     }
 
+    // Prune allowedProjectIds so only eligible projects matching selected region/scope/status are preserved
+    let finalProjectIds = formData.allowedProjectIds || [];
+    if (finalProjectIds.length > 0) {
+      const eligibleIds = new Set(projects.filter(p => p.id !== -1 && isProjectMatchingBasePermissions(p, formData)).map(p => p.id));
+      finalProjectIds = finalProjectIds.filter(id => eligibleIds.has(id));
+    }
+
     const savedUser: User = {
       id: formData.id || `user_${Date.now()}`,
       username: emailInput,
@@ -521,15 +528,16 @@ export function UserManagement({
       allowedScopes: formData.allowedScopes || ['الكل'],
       password: passwordCandidate || generateSecurePassword(12),
       
-      // New fields mapping
+      // Strict IAM fields mapping
       allowedTabs: formData.allowedTabs || ['maps', 'stats', 'layers'],
       allowedLayers: formData.allowedLayers || ['water', 'sewage', 'materials'],
+      allowedStatsSubTabs: formData.allowedStatsSubTabs || ['lengths', 'mymaps', 'general'],
       canOpenExternalLinks: formData.canOpenExternalLinks !== false,
       canFilter: formData.canFilter !== false,
       canInsert: formData.canInsert !== false,
       department: formData.department?.trim() || '',
       jobTitle: formData.jobTitle?.trim() || '',
-      allowedProjectIds: formData.allowedProjectIds || [],
+      allowedProjectIds: finalProjectIds,
       allowedStatuses: formData.allowedStatuses || ['الكل']
     };
 
@@ -744,11 +752,17 @@ export function UserManagement({
                         {language === 'en' ? 'Statuses: ' : 'الحالات: '}{u.allowedStatuses.length}
                       </div>
                     )}
-                    {u.allowedProjectIds && u.allowedProjectIds.length > 0 && (
-                      <div className="text-[9px] bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-100 dark:border-amber-900 px-1.5 py-0.5 rounded font-bold">
-                        {language === 'en' ? 'Assigned: ' : 'مشاريع مخصصة: '}{u.allowedProjectIds.length}
-                      </div>
-                    )}
+                    {u.allowedProjectIds && u.allowedProjectIds.length > 0 && (() => {
+                      const effectiveCount = u.allowedProjectIds.filter(id => {
+                        const proj = projects.find(p => p.id === id);
+                        return proj ? isProjectMatchingBasePermissions(proj, u) : false;
+                      }).length;
+                      return effectiveCount > 0 ? (
+                        <div className="text-[9px] bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-100 dark:border-amber-900 px-1.5 py-0.5 rounded font-bold">
+                          {language === 'en' ? 'Assigned: ' : 'مشاريع مخصصة: '}{effectiveCount}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
               );
@@ -1682,18 +1696,24 @@ export function UserManagement({
                     )}
                   </div>
 
-                  {selectedUser.allowedProjectIds && selectedUser.allowedProjectIds.length > 0 && (
-                    <div className="text-xs text-slate-500 dark:text-slate-400 border-t border-dashed border-slate-200 dark:border-slate-700 pt-2.5 mt-2.5">
-                      <strong className="text-amber-800 dark:text-amber-300">
-                        {language === 'en' ? `🔒 Restricted to specific projects (${selectedUser.allowedProjectIds.length}):` : `🔒 الوصول مقتصر على مشاريع محددة (${selectedUser.allowedProjectIds.length}):`}
-                      </strong>{' '}
+                  {selectedUser.allowedProjectIds && selectedUser.allowedProjectIds.length > 0 && (() => {
+                    const effectiveCount = selectedUser.allowedProjectIds.filter(id => {
+                      const proj = projects.find(p => p.id === id);
+                      return proj ? isProjectMatchingBasePermissions(proj, selectedUser) : false;
+                    }).length;
+                    return effectiveCount > 0 ? (
+                      <div className="text-xs text-slate-500 dark:text-slate-400 border-t border-dashed border-slate-200 dark:border-slate-700 pt-2.5 mt-2.5">
+                        <strong className="text-amber-800 dark:text-amber-300">
+                          {language === 'en' ? `🔒 Restricted to specific projects (${effectiveCount}):` : `🔒 الوصول مقتصر على مشاريع محددة (${effectiveCount}):`}
+                        </strong>{' '}
                       <p className="text-[10px] text-slate-400 font-semibold leading-relaxed mt-1">
                         {language === 'en' 
                           ? 'This user is restricted exclusively to projects assigned by the system admin.'
                           : 'تم تقييد رؤية هذا المستشار حصراً على المشاريع المحددة التي عينها المشرف العام. لن يتمكن من رؤية غيرها في البوابة.'}
                       </p>
                     </div>
-                  )}
+                    ) : null;
+                  })()}
                 </div>
               </div>
 
