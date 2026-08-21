@@ -528,11 +528,9 @@ export function cleanSegmentId(val: any): string {
   let str = String(val).trim();
   if (!str) return '';
 
-  // 1. Remove Segment ID statement prefixes only (case-insensitive) - strictly Segment ID
-  str = str.replace(/^(?:segment\s*id|segment_id|segment-id|segment\s*no|segment_no|segment\s*#|seg_id|segid)\s*[:=–—#=-]\s*/i, '');
-
-  // If the string starts with standalone generic label "Segment ID" followed by space
-  str = str.replace(/^(?:segment\s*id|segment_id)\s+/i, '');
+  // 1. Remove Segment ID statement prefixes only (case-insensitive)
+  str = str.replace(/^(?:segment\s*id|segment_id|segment-id|segment\s*no|segment_no|segment\s*#|seg_id|segid|سجمنت|رقم\s*السجمنت|القطاع|رقم\s*القطاع)\s*[:=–—#=-]\s*/i, '');
+  str = str.replace(/^(?:segment\s*id|segment_id|سجمنت|القطاع)\s+/i, '');
 
   // 2. Truncate before any downstream joined field labels if concatenated
   const downstreamRegex = /(?:^|\s+)(?:-|–|—)?\s*(?:PERMIT|PERMITNO|PERMIT_NO|PERMIT_NUMBER|PERM_NO|STAGE|CONTRACTOR|PROJECTNAME|PROJECTID|STREETNAME|STREET_NAME|DISTRICT|SHAPE_Length|SHAPE_LENGTH|ZONE|ZONE_NO|INNERDIAMETER|DRILLING|تصريح|رخصة|فسح|مرحلة|المقاول|اسم\s*المشروع|رقم\s*المشروع|اسم\s*الشارع|الحي|القطر|المنطقة)\s*[:=]/i;
@@ -542,11 +540,16 @@ export function cleanSegmentId(val: any): string {
   }
 
   // 3. Clean leading/trailing quotes, colons, equals, or stray whitespace
-  str = str.replace(/^["'`\s:=]+|["'`\s:=]+$/g, '').trim();
+  str = str.replace(/^["'`\s:=–—_#/\\]+|["'`\s:=–—_#/\\]+$/g, '').trim();
+
+  // 4. Specifically strip any leading hyphens/dashes before content (e.g. -SEG-01 -> SEG-01, -101 -> 101, - 24/19/01 -> 24/19/01)
+  str = str.replace(/^[-–—]+\s*/, '').trim();
+  str = str.replace(/[-–—]+$/, '').trim();
 
   if (!str) return '';
 
-  // 4. Check for invalid placeholder words
+  // 5. Check if the value contains only '-' or invalid placeholder words
+  // If it contains only '-', it is considered empty/non-existent (classified as missing data / نواقص)
   const lower = str.toLowerCase();
   const invalidKeywords = [
     '-', '/', '--', '//', '---', '///', '-/-', '- / -', '-/', '/-', '/ -', '- /', 'n/a', 'na', 'none', 'null',
@@ -558,7 +561,7 @@ export function cleanSegmentId(val: any): string {
     return '';
   }
 
-  // 5. Must contain at least one alphanumeric character (Arabic/English digit or letter)
+  // 6. Must contain at least one alphanumeric character (Arabic/English digit or letter)
   const alphanumericOnly = str.replace(/[^A-Za-z0-9\u0600-\u06FF]/g, '');
   if (alphanumericOnly.length === 0) return '';
 
@@ -571,30 +574,24 @@ export function cleanSegmentId(val: any): string {
 
 /**
  * Strips label prefixes like "Permit No:", "permit_no:", etc.
- * Returns only the pure permit number/code strictly corresponding to the Permit No statement.
- * Truncates before any concatenated downstream field headers (like ZONE:, Stage:, CONTRACTOR:, etc.).
- * Returns empty string ('') if value is empty, dashes (-), slashes (/), placeholders (- / -), or lacks explicit alphanumeric characters.
+ * Returns strictly the pure DIGITS ONLY (أرقام فقط) of the Permit No without any leading space, trailing space, hyphens (-), or letters.
+ * If value contains only '-' or invalid placeholders, returns empty string ('') (considered empty/non-existent / نواقص).
  */
 export function cleanPermitNo(val: any): string {
   if (val === null || val === undefined) return '';
   let str = String(val).trim();
   if (!str) return '';
 
-  // 1. If string contains or begins with other known GIS/CAD field names, reject immediately (NOT a permit number)
-  const otherFields = [
-    'zone', 'zone_no', 'drilling', 'drilling_type', 'drillingtype', 'stage',
-    'contractor', 'contractor_name', 'projectname', 'project_name', 'projectid',
-    'project_id', 'shape_length', 'shape_len', 'streetname', 'street_name',
-    'district', 'innerdiameter', 'inner_diameter', 'diameter', 'objectid',
-    'fid', 'layer', 'length', 'latitude', 'longitude', 'x', 'y'
-  ];
+  // 1. Convert Arabic-Indic digits (٠-٩) to standard English digits (0-9)
+  const arabicDigits: Record<string, string> = { '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9' };
+  str = str.replace(/[٠-٩]/g, d => arabicDigits[d] || d);
 
-  // 2. Remove Permit No prefixes strictly (longest keywords first)
-  str = str.replace(/^(?:permit\s*no|permit_no|permitno|permit-no|permit\s*number|permit_number|permit\s*num|permit_num|permit\s*#|permit_id|perm_no|permno|perm\s*no|perm\s*num)\s*[:=–—#=-]\s*/i, '');
-  str = str.replace(/^(?:permit\s*no|permit_no|permitno|perm_no)\s+/i, '');
+  // 2. Remove Permit No prefixes strictly
+  str = str.replace(/^(?:permit\s*no|permit_no|permitno|permit-no|permit\s*number|permit_number|permit\s*num|permit_num|permit\s*#|permit_id|perm_no|permno|perm\s*no|perm\s*num|رقم\s*الفسح|رقم\s*التصريح|الفسح|التصريح|فسح|تصريح)\s*[:=–—#=-]\s*/i, '');
+  str = str.replace(/^(?:permit\s*no|permit_no|permitno|perm_no|الفسح|التصريح)\s+/i, '');
 
   // 3. Truncate before any downstream joined field labels if concatenated
-  const downstreamRegex = /(?:^|\s+)(?:-|–|—)?\s*(?:ZONE|ZONE_NO|DRILLING|DRILLING_TYPE|DRILLINGTYPE|STAGE|CONTRACTOR|CONTRACTOR_NAME|PROJECTNAME|PROJECT_NAME|PROJECTID|PROJECT_ID|SHAPE_LENGTH|SHAPE_Length|SHAPE_LEN|STREETNAME|STREET_NAME|DISTRICT|INNERDIAMETER|INNER_DIAMETER|SEGMENT|SEGMENTID|SEGMENT_ID|SEG_ID|OBJECTID|FID)\s*[:=]/i;
+  const downstreamRegex = /(?:^|\s+)(?:-|–|—)?\s*(?:ZONE|ZONE_NO|DRILLING|DRILLING_TYPE|DRILLINGTYPE|STAGE|CONTRACTOR|CONTRACTOR_NAME|PROJECTNAME|PROJECT_NAME|PROJECTID|PROJECT_ID|SHAPE_LENGTH|SHAPE_Length|SHAPE_LEN|STREETNAME|STREET_NAME|DISTRICT|INNERDIAMETER|INNER_DIAMETER|SEGMENT|SEGMENTID|SEGMENT_ID|SEG_ID|OBJECTID|FID|المقاول|الحي|الشارع|المرحلة)\s*[:=]/i;
   const match = str.match(downstreamRegex);
   if (match && match.index !== undefined) {
     if (match.index === 0) {
@@ -608,36 +605,28 @@ export function cleanPermitNo(val: any): string {
 
   if (!str) return '';
 
-  // 5. Check if remaining string starts with or is entirely another field header or contains colons for other fields
-  for (const f of otherFields) {
-    if (new RegExp(`^${f}\\b`, 'i').test(str) || new RegExp(`\\b${f}\\s*:`, 'i').test(str)) {
-      return '';
-    }
-  }
-
-  // 6. Check for invalid placeholder words, dashes, slashes, or symbols
+  // 5. Check if the value contains only '-' or invalid placeholder words
   const lower = str.toLowerCase();
   const invalidKeywords = [
     '-', '/', '--', '//', '---', '///', '-/-', '- / -', '-/', '/-', '/ -', '- /', 'n/a', 'na', 'none', 'null',
     'undefined', 'بدون', 'لا يوجد', 'لايوجد', 'غير محدد', 'غير متوفر', 'فراغ', 'بدون تصريح', 'بدون فسح', 'لا', 'لايوجد تصريح',
-    'لا يوجد تصريح', 'لا يوجد فسح', 'لايوجد فسح', 'بدون سجمنت', 'لا يوجد سجمنت', '0', '00', '000', '0000', 'nan',
-    'ermit', 'permit', 'perm', 'prm', 'permit no', 'permit_no', 'permitno', 'no', 'num', 'number', 'id', 'id:',
-    'zone', 'drilling', 'drilling type', 'stage', 'contractor', 'projectname', 'projectid', 'shape_length', 'streetname', 'innerdiameter', 'objectid', 'fid'
+    'لا يوجد تصريح', 'لا يوجد فسح', 'لايوجد فسح', 'بدون سجمنت', 'لا يوجد سجمنت', '0', '00', '000', '0000', 'nan'
   ];
 
   if (invalidKeywords.includes(lower) || /^[-–—_#/\\:;.\s]+$/.test(str)) {
     return '';
   }
 
-  // 7. Must contain at least one alphanumeric character (Arabic/English digit or letter)
-  const alphanumericOnly = str.replace(/[^A-Za-z0-9\u0600-\u06FF]/g, '');
-  if (alphanumericOnly.length === 0) return '';
-
-  if (['id', 'ermit', 'permit', 'segment', 'seg', 'sec', 'perm', 'prm', 'no', 'num', 'null', 'undefined', 'none', 'nan', 'zone', 'stage', 'objectid', 'fid'].includes(alphanumericOnly.toLowerCase())) {
-    return '';
+  // 6. Extract strictly PURE DIGITS ONLY (أرقام فقط) without any spaces, dashes, or letters
+  const digitsMatch = str.match(/\b(\d{3,20})\b/) || str.match(/(\d+)/);
+  if (digitsMatch) {
+    const pureDigits = digitsMatch[1].trim();
+    if (pureDigits && parseInt(pureDigits, 10) > 0) {
+      return pureDigits;
+    }
   }
 
-  return str;
+  return '';
 }
 
 /**
@@ -896,37 +885,16 @@ export function isValidIdentifier(val: any): boolean {
 
   const lowerRaw = rawStr.toLowerCase();
   const invalidRawKeywords = [
-    'id', 'id:', 'segment id', 'segment_id', 'segment', 'seg', 'sec',
+    '-', '--', '---', '/', '.', 'id', 'id:', 'segment id', 'segment_id', 'segment', 'seg', 'sec',
     'permit', 'permit no', 'permit_no', 'permitno', 'ermit', 'perm', 'prm',
     'رقم', 'تصريح', 'فسح', 'سجمنت', 'قطاع', 'معرف', 'اسم', 'رمز', 'القطاع', 'السجمنت'
   ];
-  if (invalidRawKeywords.includes(lowerRaw)) return false;
+  if (invalidRawKeywords.includes(lowerRaw) || /^[-–—_#/\\:;.\s]+$/.test(rawStr)) return false;
 
-  const str = cleanSegmentId(cleanPermitNo(rawStr));
-  if (str.length === 0) return false;
+  const cleanedSeg = cleanSegmentId(rawStr);
+  const cleanedPerm = cleanPermitNo(rawStr);
 
-  // Check if string contains ONLY dashes, slashes, spaces, backslashes, dots, underscores, hashes, colons, or symbols
-  if (/^[-\s\/\\_\.:#]*$/.test(str)) return false;
-
-  const lower = str.toLowerCase();
-  const invalidKeywords = [
-    '-', '/', '--', '//', '---', '///', '-/-', '- / -', '-/', '/-', '/ -', '- /', 'n/a', 'na', 'none', 'null', 
-    'undefined', 'بدون', 'لا يوجد', 'لايوجد', 'غير محدد', 'غير متوفر', 'فراغ', 'بدون تصريح', 'بدون فسح', 'لا', 'لايوجد تصريح',
-    'لا يوجد تصريح', 'لا يوجد فسح', 'لايوجد فسح', 'بدون سجمنت', 'لا يوجد سجمنت', '0', '00', '000', '0000', 'nan',
-    'segment id', 'segment_id', 'segment', 'seg', 'sec', 'permit no', 'permit_no', 'permit', 'ermit', 'id', 'id:'
-  ];
-
-  if (invalidKeywords.includes(lower)) return false;
-
-  // Strip all non-alphanumeric characters (letters/digits in English & Arabic)
-  const alphanumericOnly = str.replace(/[^A-Za-z0-9\u0600-\u06FF]/g, '');
-  if (alphanumericOnly.length === 0) return false;
-
-  if (['id', 'ermit', 'permit', 'segment', 'seg', 'sec', 'perm', 'prm'].includes(alphanumericOnly.toLowerCase())) {
-    return false;
-  }
-
-  return true;
+  return cleanedSeg.length > 0 || cleanedPerm.length > 0;
 }
 
 /**
