@@ -98,30 +98,15 @@ class NeonQueryBuilder {
     return this;
   }
 
-  // Executes query via /api/db or direct Neon SQL driver
+  // Executes query directly via serverless Neon SQL driver
   async execute(): Promise<{ data: any[] | null; error: any }> {
-    // 1. Try serverless /api/db endpoint first
     try {
-      const resp = await fetch('/api/db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(this.options)
-      });
-      if (resp.ok) {
-        const json = await resp.json();
-        return { data: json.data, error: json.error };
-      }
-    } catch (e) {
-      // /api/db not running locally or static environment -> fallback to direct neonSql
-    }
-
-    // 2. Direct Neon SQL Driver Fallback
-    try {
-      const { action, table, eq_col, eq_val, in_col, in_vals, order, ascending, limit, data, onConflict } = this.options;
+      const { action, table, columns, eq_col, eq_val, in_col, in_vals, order, ascending, limit, data, onConflict } = this.options;
       const safeTable = table.replace(/[^a-zA-Z0-9_]/g, '');
 
       if (action === 'select') {
-        let queryStr = `SELECT * FROM public.${safeTable}`;
+        const selectCols = (columns && columns.trim() !== '') ? columns : '*';
+        let queryStr = `SELECT ${selectCols} FROM public.${safeTable}`;
         const params: any[] = [];
         const conditions: string[] = [];
 

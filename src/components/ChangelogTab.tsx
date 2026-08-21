@@ -81,116 +81,121 @@ export const ChangelogTab: React.FC<ChangelogTabProps> = ({
     setLoading(true);
     const combinedLogs: ChangelogItem[] = [];
 
-    // أ) جلب السجلات المحفوظة محلياً بـ localStorage
     try {
-      const localLogsRaw = localStorage.getItem('water_maps_local_changelogs');
-      if (localLogsRaw) {
-        const parsed = JSON.parse(localLogsRaw);
-        if (Array.isArray(parsed)) {
-          combinedLogs.push(...parsed);
-        }
-      }
-    } catch (e) {
-      console.warn('Error reading local changelogs:', e);
-    }
-
-    // ب) جلب السجلات من Database table project_changelogs
-    const db = getDatabaseClient();
-    if (db) {
+      // أ) جلب السجلات المحفوظة محلياً بـ localStorage
       try {
-        const { data, error } = await (db.from('project_changelogs') as any)
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          data.forEach((row: any) => {
-            const diffData = row.diff || {};
-            const logItem: ChangelogItem = {
-              id: row.id || `db-${Date.now()}-${Math.random()}`,
-              projectId: row.project_id || diffData.projectId,
-              projectName: row.project_name || diffData.projectName || 'مشروع شبكة',
-              operationalNumber: diffData.operationalNumber || row.operational_number || '',
-              userName: diffData.userName || row.user_name || 'المهندس الفني',
-              userRole: diffData.userRole || 'عضو النظام',
-              changeType: diffData.changeType || row.change_type || 'edit',
-              timestamp: diffData.timestamp || (row.created_at ? new Date(row.created_at).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }) : 'سابقاً'),
-              createdAtISO: row.created_at || diffData.createdAtISO || new Date().toISOString(),
-              summary: diffData.summary || `تعديل في بيانات مشروع: ${row.project_name || ''}`,
-              fieldChanges: diffData.fieldChanges || [],
-              mapDetails: diffData.mapDetails || (diffData.diff ? {
-                totalLengthDiffKm: diffData.diff.totalLengthDiffKm,
-                addedPermitsCount: diffData.diff.addedPermits?.length || 0,
-                removedPermitsCount: diffData.diff.removedPermits?.length || 0,
-                yellowStageChangesCount: diffData.diff.yellowLineStageChanges?.length || 0,
-                summaryMessages: diffData.diff.summaryMessages || []
-              } : undefined)
-            };
-            combinedLogs.push(logItem);
-          });
+        const localLogsRaw = localStorage.getItem('water_maps_local_changelogs');
+        if (localLogsRaw) {
+          const parsed = JSON.parse(localLogsRaw);
+          if (Array.isArray(parsed)) {
+            combinedLogs.push(...parsed);
+          }
         }
-      } catch (err) {
-        console.warn('⚠️ Notice fetching project_changelogs (falling back to local memory):', err);
+      } catch (e) {
+        console.warn('Error reading local changelogs:', e);
       }
 
-      // جـ) تحويل الإشعارات المخزنة في notifications إلى سجلات إضافية للتغطية الشاملة
-      try {
-        const { data: notifData } = await (db.from('notifications') as any)
-          .select('*')
-          .order('created_at', { ascending: false });
+      // ب) جلب السجلات من Database table project_changelogs
+      const db = getDatabaseClient();
+      if (db) {
+        try {
+          const { data, error } = await (db.from('project_changelogs') as any)
+            .select('*')
+            .order('created_at', { ascending: false });
 
-        if (notifData && notifData.length > 0) {
-          notifData.forEach((n: any) => {
-            const msg = n.message || '';
-            // استخراج اسم المهندس إن وُجد بالرسالة
-            let engName = 'المهندس المسؤول';
-            const matchName = msg.match(/قام المهندس\s+([^\s]+(?:\s+[^\s]+)*?)\s+بتعديل|قام المهندس\s+([^\s]+(?:\s+[^\s]+)*?)\s+بإضافة/);
-            if (matchName) {
-              engName = matchName[1] || matchName[2] || engName;
-            }
+          if (!error && data && data.length > 0) {
+            data.forEach((row: any) => {
+              const diffData = typeof row.diff === 'string' ? JSON.parse(row.diff || '{}') : (row.diff || {});
+              const logItem: ChangelogItem = {
+                id: String(row.id || `db-${Date.now()}-${Math.random()}`),
+                projectId: row.project_id || diffData.projectId,
+                projectName: row.project_name || diffData.projectName || 'مشروع شبكة',
+                operationalNumber: diffData.operationalNumber || row.operational_number || '',
+                userName: diffData.userName || row.user_name || 'المهندس الفني',
+                userRole: diffData.userRole || 'عضو النظام',
+                changeType: diffData.changeType || row.change_type || 'edit',
+                timestamp: diffData.timestamp || (row.created_at ? new Date(row.created_at).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }) : 'سابقاً'),
+                createdAtISO: row.created_at || diffData.createdAtISO || new Date().toISOString(),
+                summary: diffData.summary || `تعديل في بيانات مشروع: ${row.project_name || ''}`,
+                fieldChanges: diffData.fieldChanges || [],
+                mapDetails: diffData.mapDetails || (diffData.diff ? {
+                  totalLengthDiffKm: diffData.diff.totalLengthDiffKm,
+                  addedPermitsCount: diffData.diff.addedPermits?.length || 0,
+                  removedPermitsCount: diffData.diff.removedPermits?.length || 0,
+                  yellowStageChangesCount: diffData.diff.yellowLineStageChanges?.length || 0,
+                  summaryMessages: diffData.diff.summaryMessages || []
+                } : undefined)
+              };
+              combinedLogs.push(logItem);
+            });
+          }
+        } catch (err) {
+          console.warn('⚠️ Notice fetching project_changelogs (falling back to local memory):', err);
+        }
 
-            // التحقق مما إذا كان الإشعار متضمناً لتعديل ولم يُضف مسبقاً
-            const isEditOrAdd = n.type === 'edit' || n.type === 'add' || n.type === 'change_detected';
-            if (isEditOrAdd && msg) {
-              const notifLogId = `notif-${n.id}`;
-              const exists = combinedLogs.some(c => c.id === notifLogId || (c.createdAtISO === n.created_at && c.projectName === n.project_name));
-              
-              if (!exists) {
-                combinedLogs.push({
-                  id: notifLogId,
-                  projectId: n.project_id,
-                  projectName: n.project_name || 'مشروع شبكة',
-                  operationalNumber: '',
-                  userName: engName,
-                  userRole: 'مهندس النظام',
-                  changeType: n.type === 'add' ? 'add' : (n.type === 'change_detected' ? 'map_update' : 'edit'),
-                  timestamp: n.created_at ? new Date(n.created_at).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }) : 'سابقاً',
-                  createdAtISO: n.created_at || new Date().toISOString(),
-                  summary: msg
-                });
+        // جـ) تحويل الإشعارات المخزنة في notifications إلى سجلات إضافية للتغطية الشاملة
+        try {
+          const { data: notifData } = await (db.from('notifications') as any)
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (notifData && notifData.length > 0) {
+            notifData.forEach((n: any) => {
+              const msg = n.message || '';
+              // استخراج اسم المهندس إن وُجد بالرسالة
+              let engName = 'المهندس المسؤول';
+              const matchName = msg.match(/قام المهندس\s+([^\s]+(?:\s+[^\s]+)*?)\s+بتعديل|قام المهندس\s+([^\s]+(?:\s+[^\s]+)*?)\s+بإضافة/);
+              if (matchName) {
+                engName = matchName[1] || matchName[2] || engName;
               }
-            }
-          });
+
+              // التحقق مما إذا كان الإشعار متضمناً لتعديل ولم يُضف مسبقاً
+              const isEditOrAdd = n.type === 'edit' || n.type === 'add' || n.type === 'change_detected';
+              if (isEditOrAdd && msg) {
+                const notifLogId = `notif-${n.id}`;
+                const exists = combinedLogs.some(c => c.id === notifLogId || (c.createdAtISO === n.created_at && c.projectName === n.project_name));
+                
+                if (!exists) {
+                  combinedLogs.push({
+                    id: notifLogId,
+                    projectId: n.project_id,
+                    projectName: n.project_name || 'مشروع شبكة',
+                    operationalNumber: '',
+                    userName: engName,
+                    userRole: 'مهندس النظام',
+                    changeType: n.type === 'add' ? 'add' : (n.type === 'change_detected' ? 'map_update' : 'edit'),
+                    timestamp: n.created_at ? new Date(n.created_at).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }) : 'سابقاً',
+                    createdAtISO: n.created_at || new Date().toISOString(),
+                    summary: msg
+                  });
+                }
+              }
+            });
+          }
+        } catch (err) {
+          console.warn('⚠️ Notice converting notifications to changelogs:', err);
         }
-      } catch (err) {
-        console.warn('⚠️ Notice converting notifications to changelogs:', err);
       }
+
+      // د) ترتيب وتفريد السجلات بحسب التاريخ التنازلي
+      const uniqueLogsMap = new Map<string, ChangelogItem>();
+      combinedLogs.forEach(item => {
+        const key = `${item.projectName}_${item.createdAtISO}_${item.summary}`;
+        if (!uniqueLogsMap.has(key)) {
+          uniqueLogsMap.set(key, item);
+        }
+      });
+
+      const sorted = Array.from(uniqueLogsMap.values()).sort((a: ChangelogItem, b: ChangelogItem) => {
+        return new Date(b.createdAtISO).getTime() - new Date(a.createdAtISO).getTime();
+      });
+
+      setChangelogs(sorted);
+    } catch (globalErr) {
+      console.error('Error in fetchChangelogs:', globalErr);
+    } finally {
+      setLoading(false);
     }
-
-    // د) ترتيب وتفريد السجلات بحسب التاريخ التنازلي
-    const uniqueLogsMap = new Map<string, ChangelogItem>();
-    combinedLogs.forEach(item => {
-      const key = `${item.projectName}_${item.createdAtISO}_${item.summary}`;
-      if (!uniqueLogsMap.has(key)) {
-        uniqueLogsMap.set(key, item);
-      }
-    });
-
-    const sorted = Array.from(uniqueLogsMap.values()).sort((a: ChangelogItem, b: ChangelogItem) => {
-      return new Date(b.createdAtISO).getTime() - new Date(a.createdAtISO).getTime();
-    });
-
-    setChangelogs(sorted);
-    setLoading(false);
   };
 
   useEffect(() => {
