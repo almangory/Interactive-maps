@@ -52,6 +52,9 @@ export interface User {
 
   // صلاحيات أقسام الإحصائيات التفصيلية
   allowedStatsSubTabs?: string[]; // المعرفات المسموحة: ["lengths", "mymaps", "general"]
+
+  // صلاحية حالات المشاريع المسموحة
+  allowedStatuses?: string[]; // e.g. ["جاري", "مكتمل", "معلق", "مسلم ابتدائي", "مسحوب", "جاري الاستلام الابتدائي", "جاري الاستلام النهائي", "متوقف كليا", "متوقف جزئيا", "مشروع مستأنف", "تم انهاء العقد"] - empty or ["الكل"] means all statuses
 }
 
 export interface AppNotification {

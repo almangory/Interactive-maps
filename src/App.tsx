@@ -143,7 +143,11 @@ export const isProjectAllowedForUser = (p: Project, currentUser: User): boolean 
     isLayerAllowed = uLayers.includes(projLayer);
   }
 
-  return isRegionAllowed && isScopeAllowed && isLayerAllowed;
+  const uStatuses = (currentUser.allowedStatuses || ['الكل']).map(s => s.trim());
+  const isAllStatuses = uStatuses.includes('الكل') || uStatuses.length === 0;
+  const isStatusAllowed = isAllStatuses || uStatuses.some(st => (p.status || '').trim() === st);
+
+  return isRegionAllowed && isScopeAllowed && isLayerAllowed && isStatusAllowed;
 };
 
 export const getProjectDifferencesMessage = (oldP: Project, newP: Project): string => {
@@ -594,6 +598,12 @@ export default function App() {
               else { try { allowedProjectIds = JSON.parse(u.allowed_project_ids).map(Number); } catch (e) { } }
             }
 
+            let allowedStatuses: string[] = ['الكل'];
+            if (u.allowed_statuses) {
+              if (Array.isArray(u.allowed_statuses)) { allowedStatuses = u.allowed_statuses; } 
+              else { try { allowedStatuses = JSON.parse(u.allowed_statuses); } catch (e) { allowedStatuses = [u.allowed_statuses]; } }
+            }
+
             return {
               id: u.id,
               username: u.username,
@@ -615,7 +625,8 @@ export default function App() {
                 : (existingLocal?.canInsert !== false),
               department: u.department || existingLocal?.department || '',
               jobTitle: u.job_title || existingLocal?.jobTitle || '',
-              allowedProjectIds: allowedProjectIds
+              allowedProjectIds: allowedProjectIds,
+              allowedStatuses: allowedStatuses
             };
           });
 
@@ -1158,6 +1169,11 @@ export default function App() {
         if (Array.isArray(found.allowed_project_ids)) { allowedProjectIds = found.allowed_project_ids.map(Number); } 
         else { try { allowedProjectIds = JSON.parse(found.allowed_project_ids).map(Number); } catch (e) { } }
       }
+      let allowedStatuses: string[] = ['الكل'];
+      if (found.allowed_statuses) {
+        if (Array.isArray(found.allowed_statuses)) { allowedStatuses = found.allowed_statuses; } 
+        else { try { allowedStatuses = JSON.parse(found.allowed_statuses); } catch (e) { allowedStatuses = [found.allowed_statuses]; } }
+      }
 
       const mappedUser = {
         id: found.id,
@@ -1174,7 +1190,8 @@ export default function App() {
         canInsert: found.can_insert !== false,
         department: found.department || '',
         jobTitle: found.job_title || '',
-        allowedProjectIds: allowedProjectIds
+        allowedProjectIds: allowedProjectIds,
+        allowedStatuses: allowedStatuses
       };
 
       setCurrentUser(mappedUser);
@@ -1290,6 +1307,11 @@ export default function App() {
         if (Array.isArray(found.allowed_project_ids)) { allowedProjectIds = found.allowed_project_ids.map(Number); } 
         else { try { allowedProjectIds = JSON.parse(found.allowed_project_ids).map(Number); } catch (e) { } }
       }
+      let allowedStatuses: string[] = ['الكل'];
+      if (found.allowed_statuses) {
+        if (Array.isArray(found.allowed_statuses)) { allowedStatuses = found.allowed_statuses; } 
+        else { try { allowedStatuses = JSON.parse(found.allowed_statuses); } catch (e) { allowedStatuses = [found.allowed_statuses]; } }
+      }
 
       const mappedUser: User = {
         id: found.id,
@@ -1306,7 +1328,8 @@ export default function App() {
         canInsert: found.can_insert !== false,
         department: found.department || '',
         jobTitle: found.job_title || '',
-        allowedProjectIds: allowedProjectIds
+        allowedProjectIds: allowedProjectIds,
+        allowedStatuses: allowedStatuses
       };
 
       setCurrentUser(mappedUser);
@@ -1541,7 +1564,8 @@ export default function App() {
       can_insert: updatedUser.canInsert !== false,
       department: updatedUser.department || '',
       job_title: updatedUser.jobTitle || '',
-      allowed_project_ids: updatedUser.allowedProjectIds || []
+      allowed_project_ids: updatedUser.allowedProjectIds || [],
+      allowed_statuses: updatedUser.allowedStatuses || ['الكل']
     };
 
     const exists = users.some(u => u.id === updatedUser.id);
