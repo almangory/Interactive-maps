@@ -1456,10 +1456,8 @@ export function UserManagement({
                 </div>
               )}
             </div>
-
-                </div>
-              );
-            })()}
+          );
+        })()}
 
             {/* Form actions */}
             <div className={`flex items-center ${isRtl ? 'justify-end' : 'justify-end'} gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 shrink-0`}>
