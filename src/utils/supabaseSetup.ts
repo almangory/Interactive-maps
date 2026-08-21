@@ -24,7 +24,7 @@ const sessionLatestReportCache = new Map<string, { report: HistoricalReport; tim
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 // 🚀 Lightweight Column Selection to slash Egress Bandwidth by ~95%
-const LIGHTWEIGHT_REPORT_COLUMNS = 'id, project_id, project_name, map_url, total_length_meters, total_length_km, total_features_count, color_breakdown, parsed_at, created_at, yellow_no_permit_count, yellow_no_permit_meters, yellow_no_permit_km';
+const LIGHTWEIGHT_REPORT_COLUMNS = 'id, project_id, project_name, map_url, total_length_meters, total_length_km, total_features_count, color_breakdown, parsed_at, created_at, yellow_no_permit_count, yellow_no_permit_meters, yellow_no_permit_km, red_no_segment_count, red_no_segment_meters, red_no_segment_km';
 
 function mapRowToHistoricalReport(row: any): HistoricalReport {
   const colorBreakdown = row.color_breakdown || {};
@@ -515,6 +515,9 @@ export const ReportHistoryStore = {
     if (db) {
       try {
         const sanitizedItems = sanitizeItemsForStorage(analysisResult.items || []);
+        const yellowStats = analysisResult.yellowNoPermitStats || { count: 0, lengthMeters: 0, lengthKm: 0 };
+        const redStats = analysisResult.redNoSegmentStats || { count: 0, lengthMeters: 0, lengthKm: 0 };
+
         const { data, error } = await (db.from('project_reports') as any)
           .insert([{
             project_id: projectId,
@@ -524,6 +527,12 @@ export const ReportHistoryStore = {
             total_length_km: analysisResult.totalLengthKm,
             total_features_count: analysisResult.totalFeaturesCount,
             color_breakdown: colorBreakdownPayload,
+            yellow_no_permit_count: yellowStats.count || 0,
+            yellow_no_permit_meters: yellowStats.lengthMeters || 0,
+            yellow_no_permit_km: yellowStats.lengthKm || 0,
+            red_no_segment_count: redStats.count || 0,
+            red_no_segment_meters: redStats.lengthMeters || 0,
+            red_no_segment_km: redStats.lengthKm || 0,
             items: sanitizedItems,
             parsed_at: analysisResult.parsedAt || new Date().toLocaleString('ar-SA')
           }])
