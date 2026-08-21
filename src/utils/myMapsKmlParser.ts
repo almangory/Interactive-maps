@@ -417,6 +417,8 @@ export async function fetchMyMapsKML(link: string): Promise<string> {
     throw new Error('رابط غير صالح لخرائط قوقل My Maps (لم يتم العثور على رمز mid)');
   }
 
+  console.log(`🗺️ [Google My Maps KML] البدء في فحص واستخراج بيانات الخريطة من الرابط: ${initialUrl} (MID: ${mid || 'N/A'})`);
+
   // Step 1: Fetch root KML
   let rootXmlText = '';
   try {
@@ -430,9 +432,11 @@ export async function fetchMyMapsKML(link: string): Promise<string> {
     }
   }
 
+  console.log(`📥 [Google My Maps KML] تم تحميل ملف الخريطة بنجاح بحجم: ${(rootXmlText.length / 1024).toFixed(1)} KB`);
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(rootXmlText, 'text/xml');
   const placemarks = xmlDoc.getElementsByTagName('Placemark');
+  console.log(`📍 [Google My Maps KML] تم العثور على ${placemarks.length} عنصر (Placemark) في ملف الخريطة.`);
 
   // If placemarks exist in root document, return rootXmlText directly
   if (placemarks.length > 0) {

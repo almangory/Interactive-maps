@@ -468,7 +468,7 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
         }
       }
     } else {
-      showToast(`✨ تم إجراء التحليل وحفظ التقرير لمشروع (${proj.name}) بقاعدة البيانات بنجاح!`);
+      showToast(`✨ تم جلب وتحليل خريطة (${proj.name}) بنجاح: تم استخراج ${newResult.totalFeaturesCount} عنصر بإجمالي أطوال ${newResult.totalLengthKm} كم!`);
     }
   };
 
