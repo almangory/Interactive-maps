@@ -285,7 +285,15 @@ export function UserManagement({
     setSelectedUser(user);
     setIsEditing(false);
     setIsCreating(false);
-    setFormData(user);
+    const userTabs = user.allowedTabs || ['maps', 'stats', 'layers'];
+    const hasLayers = userTabs.includes('layers');
+    const hasStats = userTabs.includes('stats');
+    setFormData({
+      ...user,
+      allowedTabs: userTabs,
+      allowedLayers: hasLayers ? (user.allowedLayers || ['water', 'sewage', 'materials']) : [],
+      allowedStatsSubTabs: hasStats ? (user.allowedStatsSubTabs || ['lengths', 'mymaps', 'general']) : []
+    });
   };
 
   const handleStartCreate = () => {
@@ -318,13 +326,16 @@ export function UserManagement({
     if (!isAdmin || !selectedUser) return;
     setIsEditing(true);
     const displayedUsername = selectedUser.username;
+    const userTabs = selectedUser.allowedTabs || ['maps', 'stats', 'layers'];
+    const hasLayers = userTabs.includes('layers');
+    const hasStats = userTabs.includes('stats');
     
     setFormData({
       ...selectedUser,
       username: displayedUsername,
-      allowedTabs: selectedUser.allowedTabs || ['maps', 'stats', 'layers'],
-      allowedLayers: selectedUser.allowedLayers || ['water', 'sewage', 'materials'],
-      allowedStatsSubTabs: selectedUser.allowedStatsSubTabs || ['lengths', 'mymaps', 'general'],
+      allowedTabs: userTabs,
+      allowedLayers: hasLayers ? (selectedUser.allowedLayers || ['water', 'sewage', 'materials']) : [],
+      allowedStatsSubTabs: hasStats ? (selectedUser.allowedStatsSubTabs || ['lengths', 'mymaps', 'general']) : [],
       canOpenExternalLinks: selectedUser.canOpenExternalLinks !== false,
       canFilter: selectedUser.canFilter !== false,
       canInsert: selectedUser.canInsert !== false,
@@ -386,13 +397,45 @@ export function UserManagement({
 
   const handleTabToggle = (tabId: string) => {
     const currentTabs = formData.allowedTabs || ['maps', 'stats', 'layers'];
+    const isRemoving = currentTabs.includes(tabId);
     let newTabs: string[];
-    if (currentTabs.includes(tabId)) {
+    
+    if (isRemoving) {
       newTabs = currentTabs.filter(t => t !== tabId);
     } else {
       newTabs = [...currentTabs, tabId];
     }
-    setFormData({ ...formData, allowedTabs: newTabs });
+
+    const nextData: Partial<User> = {
+      ...formData,
+      allowedTabs: newTabs
+    };
+
+    // 🔗 IAM Permission Dependency Rules:
+    // 1. If 'layers' tab is disabled -> automatically disable/clear allowedLayers
+    if (isRemoving && tabId === 'layers') {
+      nextData.allowedLayers = [];
+    } else if (!isRemoving && tabId === 'layers') {
+      if (!nextData.allowedLayers || nextData.allowedLayers.length === 0) {
+        nextData.allowedLayers = ['water', 'sewage', 'materials'];
+      }
+    }
+
+    // 2. If 'stats' tab is disabled -> automatically disable/clear allowedStatsSubTabs
+    if (isRemoving && tabId === 'stats') {
+      nextData.allowedStatsSubTabs = [];
+    } else if (!isRemoving && tabId === 'stats') {
+      if (!nextData.allowedStatsSubTabs || nextData.allowedStatsSubTabs.length === 0) {
+        nextData.allowedStatsSubTabs = ['lengths', 'mymaps', 'general'];
+      }
+    }
+
+    // 3. If 'maps' tab is disabled -> clear custom project IDs
+    if (isRemoving && tabId === 'maps') {
+      nextData.allowedProjectIds = [];
+    }
+
+    setFormData(nextData);
   };
 
   // Specific projects selection handlers
@@ -962,117 +1005,155 @@ export function UserManagement({
                   </div>
                 </div>
 
-                {/* B4. Project Layers Permissions */}
-                <div className="space-y-2 col-span-1 md:col-span-2 border-t border-slate-200/60 dark:border-slate-700 pt-3 mt-1">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block">
-                    {t('users.allowedLayers')}:
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {LAYER_OPTIONS.map(layer => {
-                      const list = formData.allowedLayers || ['water', 'sewage', 'materials'];
-                      const isAllowed = list.includes(layer.id) || list.includes('الكل');
-                      return (
-                        <button
-                          type="button"
-                          key={layer.id}
-                          onClick={() => {
-                            let baseList = list.includes('الكل') 
-                              ? ['water', 'sewage', 'materials'] 
-                              : list.filter(l => l !== 'الكل');
-                            let newLayers: string[];
-                            if (baseList.includes(layer.id)) {
-                              newLayers = baseList.filter(l => l !== layer.id);
-                            } else {
-                              newLayers = [...baseList, layer.id];
-                            }
-                            if (newLayers.length === 0) {
-                              newLayers = ['water', 'sewage', 'materials'];
-                            }
-
-                            // Sync allowedScopes
-                            let newScopes: string[] = [];
-                            if (newLayers.includes('water') && newLayers.includes('sewage')) {
-                              newScopes = ['الكل'];
-                            } else if (newLayers.includes('water')) {
-                              newScopes = ['مياه'];
-                            } else if (newLayers.includes('sewage')) {
-                              newScopes = ['صرف صحي'];
-                            } else {
-                              newScopes = ['الكل'];
-                            }
-
-                            setFormData({
-                              ...formData,
-                              allowedLayers: newLayers,
-                              allowedScopes: newScopes
-                            });
-                          }}
-                          className={`flex items-center justify-between p-2.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
-                            isAllowed
-                              ? 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 shadow-xs'
-                              : 'bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-400'
-                          }`}
-                        >
-                          <span>{layer.label}</span>
-                          {isAllowed ? (
-                            <CheckSquare className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                          ) : (
-                            <Square className="h-4 w-4 text-slate-300 dark:text-slate-600 shrink-0" />
+                {/* B4. Project Layers Permissions (Linked to 'layers' tab) */}
+                {(() => {
+                  const isLayersTabActive = (formData.allowedTabs || []).includes('layers');
+                  return (
+                    <div className={`space-y-2 col-span-1 md:col-span-2 border-t border-slate-200/60 dark:border-slate-700 pt-3 mt-1 transition-opacity ${
+                      isLayersTabActive ? 'opacity-100' : 'opacity-40 select-none'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                          <span>{t('users.allowedLayers')}:</span>
+                          {!isLayersTabActive && (
+                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/80 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                              🔒 {language === 'en' ? 'Disabled (Requires activating Project Layers tab above)' : 'معطل (يتطلب تفعيل تبويب طبقات المشاريع بالأعلى)'}
+                            </span>
                           )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                        </label>
+                      </div>
 
-                {/* B5. Statistics Sub-Tabs Permissions */}
-                <div className="space-y-2 col-span-1 md:col-span-2 border-t border-slate-200/60 dark:border-slate-700 pt-3 mt-1">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-200 block">
-                    {t('users.allowedStatsSubTabs')}:
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {STATS_SUBTAB_OPTIONS.map(subtab => {
-                      const list = formData.allowedStatsSubTabs || ['lengths', 'mymaps', 'general'];
-                      const isAllowed = list.includes(subtab.id) || list.includes('الكل');
-                      return (
-                        <button
-                          type="button"
-                          key={subtab.id}
-                          onClick={() => {
-                            let baseList = list.includes('الكل') 
-                              ? ['lengths', 'mymaps', 'general'] 
-                              : list.filter(s => s !== 'الكل');
-                            let newStats: string[];
-                            if (baseList.includes(subtab.id)) {
-                              newStats = baseList.filter(s => s !== subtab.id);
-                            } else {
-                              newStats = [...baseList, subtab.id];
-                            }
-                            if (newStats.length === 0) {
-                              newStats = ['lengths', 'mymaps', 'general'];
-                            }
-                            setFormData({
-                              ...formData,
-                              allowedStatsSubTabs: newStats
-                            });
-                          }}
-                          className={`flex items-center justify-between p-2.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
-                            isAllowed
-                              ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-900 dark:text-blue-200 shadow-xs'
-                              : 'bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-400'
-                          }`}
-                        >
-                          <span>{subtab.label}</span>
-                          {isAllowed ? (
-                            <CheckSquare className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                          ) : (
-                            <Square className="h-4 w-4 text-slate-300 dark:text-slate-600 shrink-0" />
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {LAYER_OPTIONS.map(layer => {
+                          const list = isLayersTabActive ? (formData.allowedLayers || ['water', 'sewage', 'materials']) : [];
+                          const isAllowed = isLayersTabActive && (list.includes(layer.id) || list.includes('الكل'));
+                          return (
+                            <button
+                              type="button"
+                              key={layer.id}
+                              disabled={!isLayersTabActive}
+                              onClick={() => {
+                                if (!isLayersTabActive) return;
+                                let baseList = list.includes('الكل') 
+                                  ? ['water', 'sewage', 'materials'] 
+                                  : list.filter(l => l !== 'الكل');
+                                let newLayers: string[];
+                                if (baseList.includes(layer.id)) {
+                                  newLayers = baseList.filter(l => l !== layer.id);
+                                } else {
+                                  newLayers = [...baseList, layer.id];
+                                }
+                                if (newLayers.length === 0) {
+                                  newLayers = ['water', 'sewage', 'materials'];
+                                }
+
+                                // Sync allowedScopes
+                                let newScopes: string[] = [];
+                                if (newLayers.includes('water') && newLayers.includes('sewage')) {
+                                  newScopes = ['الكل'];
+                                } else if (newLayers.includes('water')) {
+                                  newScopes = ['مياه'];
+                                } else if (newLayers.includes('sewage')) {
+                                  newScopes = ['صرف صحي'];
+                                } else {
+                                  newScopes = ['الكل'];
+                                }
+
+                                setFormData({
+                                  ...formData,
+                                  allowedLayers: newLayers,
+                                  allowedScopes: newScopes
+                                });
+                              }}
+                              className={`flex items-center justify-between p-2.5 rounded-lg text-xs font-bold transition-all border ${
+                                !isLayersTabActive 
+                                  ? 'bg-slate-100/60 dark:bg-slate-800/40 border-dashed border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed'
+                                  : isAllowed
+                                    ? 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 shadow-xs cursor-pointer'
+                                    : 'bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-400 cursor-pointer'
+                              }`}
+                            >
+                              <span>{layer.label}</span>
+                              {isAllowed ? (
+                                <CheckSquare className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                              ) : (
+                                <Square className="h-4 w-4 text-slate-300 dark:text-slate-600 shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* B5. Statistics Sub-Tabs Permissions (Linked to 'stats' tab) */}
+                {(() => {
+                  const isStatsTabActive = (formData.allowedTabs || []).includes('stats');
+                  return (
+                    <div className={`space-y-2 col-span-1 md:col-span-2 border-t border-slate-200/60 dark:border-slate-700 pt-3 mt-1 transition-opacity ${
+                      isStatsTabActive ? 'opacity-100' : 'opacity-40 select-none'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                          <span>{t('users.allowedStatsSubTabs')}:</span>
+                          {!isStatsTabActive && (
+                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/80 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+                              🔒 {language === 'en' ? 'Disabled (Requires activating Statistics tab above)' : 'معطل (يتطلب تفعيل تبويب الإحصائيات الجغرافية بالأعلى)'}
+                            </span>
                           )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {STATS_SUBTAB_OPTIONS.map(subtab => {
+                          const list = isStatsTabActive ? (formData.allowedStatsSubTabs || ['lengths', 'mymaps', 'general']) : [];
+                          const isAllowed = isStatsTabActive && (list.includes(subtab.id) || list.includes('الكل'));
+                          return (
+                            <button
+                              type="button"
+                              key={subtab.id}
+                              disabled={!isStatsTabActive}
+                              onClick={() => {
+                                if (!isStatsTabActive) return;
+                                let baseList = list.includes('الكل') 
+                                  ? ['lengths', 'mymaps', 'general'] 
+                                  : list.filter(s => s !== 'الكل');
+                                let newStats: string[];
+                                if (baseList.includes(subtab.id)) {
+                                  newStats = baseList.filter(s => s !== subtab.id);
+                                } else {
+                                  newStats = [...baseList, subtab.id];
+                                }
+                                if (newStats.length === 0) {
+                                  newStats = ['lengths', 'mymaps', 'general'];
+                                }
+                                setFormData({
+                                  ...formData,
+                                  allowedStatsSubTabs: newStats
+                                });
+                              }}
+                              className={`flex items-center justify-between p-2.5 rounded-lg text-xs font-bold transition-all border ${
+                                !isStatsTabActive
+                                  ? 'bg-slate-100/60 dark:bg-slate-800/40 border-dashed border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed'
+                                  : isAllowed
+                                    ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-900 dark:text-blue-200 shadow-xs cursor-pointer'
+                                    : 'bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-400 cursor-pointer'
+                              }`}
+                            >
+                              <span>{subtab.label}</span>
+                              {isAllowed ? (
+                                <CheckSquare className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                              ) : (
+                                <Square className="h-4 w-4 text-slate-300 dark:text-slate-600 shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -1206,7 +1287,18 @@ export function UserManagement({
             </div>
 
             {/* Custom project permissions based on Sub-Program selection */}
-            <div className="border border-slate-200 dark:border-slate-700 rounded-2xl p-4 bg-amber-50/20 dark:bg-amber-950/20 border-amber-200/50 space-y-4">
+            {(() => {
+              const isMapsTabActive = (formData.allowedTabs || []).includes('maps');
+              return (
+                <div className={`border border-slate-200 dark:border-slate-700 rounded-2xl p-4 bg-amber-50/20 dark:bg-amber-950/20 border-amber-200/50 space-y-4 transition-opacity ${
+                  isMapsTabActive ? 'opacity-100' : 'opacity-40 select-none'
+                }`}>
+                  {!isMapsTabActive && (
+                    <div className="bg-amber-100/80 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 p-2.5 rounded-xl text-xs font-bold border border-amber-300 dark:border-amber-800 flex items-center gap-2">
+                      <span>🔒</span>
+                      <span>{language === 'en' ? 'Custom projects assignment is locked because Interactive Maps tab is not activated above.' : 'صلاحية تحديد المشاريع معطلة لأن تبويب الخرائط التفاعلية غير مفعل بالأعلى.'}</span>
+                    </div>
+                  )}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/30 dark:border-amber-800/30 pb-2">
                 <div>
                   <h5 className="text-xs font-extrabold text-amber-800 dark:text-amber-300 flex items-center gap-1">
@@ -1364,6 +1456,10 @@ export function UserManagement({
                 </div>
               )}
             </div>
+
+                </div>
+              );
+            })()}
 
             {/* Form actions */}
             <div className={`flex items-center ${isRtl ? 'justify-end' : 'justify-end'} gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 shrink-0`}>
