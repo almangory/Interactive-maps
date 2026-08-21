@@ -1091,32 +1091,32 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
 
               <button
                 type="button"
-                onClick={handleRunPermitInspection}
-                className="px-3 py-1.5 bg-emerald-600/90 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shadow-md cursor-pointer border border-emerald-400/30"
-                title="فحص واستخراج أرقام تصاريح وفسوح الحفر"
-              >
-                <FileCheck className="h-3.5 w-3.5" />
-                <span>تدقيق الرخص 📜</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleRunSegmentVault}
+                onClick={() => setActiveAnalysisTab('segments')}
                 className="px-3 py-1.5 bg-blue-600/90 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shadow-md cursor-pointer border border-blue-400/30"
-                title="فحص وتوليد معرفات قطاعات العمل Segment ID"
+                title="عرض وتصنيف معرفات قطاعات العمل Segment ID"
               >
                 <Hash className="h-3.5 w-3.5" />
-                <span>تدقيق السجمنت 🏷️</span>
+                <span>تصنيف السجمنت #</span>
               </button>
 
               <button
                 type="button"
-                onClick={handleRunFullFormatterPipeline}
-                className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
-                title="تشغيل محرك الفحص والتدقيق الكامل للبيانات والرخص والسجمنت"
+                onClick={() => setActiveAnalysisTab('permits')}
+                className="px-3 py-1.5 bg-emerald-600/90 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shadow-md cursor-pointer border border-emerald-400/30"
+                title="عرض وتصنيف أرقام تصاريح وفسوح الحفر"
               >
-                <Sparkles className="h-3.5 w-3.5 text-amber-900" />
-                <span>التدقيق الشامل ⚡</span>
+                <FileCheck className="h-3.5 w-3.5" />
+                <span>تصنيف الرخص 📜</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveAnalysisTab('lines')}
+                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+                title="جدول تفاصيل الخطوط وحصر الأطوال"
+              >
+                <Ruler className="h-3.5 w-3.5 text-blue-400" />
+                <span>حصر الأطوال 📏</span>
               </button>
             </div>
           </div>
@@ -1535,19 +1535,6 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
               >
                 <Ruler className="h-4 w-4" />
                 <span>4- تفاصيل الخطوط وحصر الأطوال 📏</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveAnalysisTab('formatter')}
-                className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-                  activeAnalysisTab === 'formatter'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700'
-                }`}
-              >
-                <Sparkles className="h-4 w-4" />
-                <span>5- تنسيق البيانات وSegment Vault 🛠️</span>
               </button>
             </div>
 
@@ -2087,233 +2074,6 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
               </div>
             )}
 
-            {/* TAB CONTENT 4: Attribute Formatter & Segment Vault Tab */}
-            {activeAnalysisTab === 'formatter' && (
-              <div className="p-6 space-y-6">
-                {/* Section Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
-                  <div>
-                    <h4 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-amber-500" />
-                      <span>قسم تنسيق البيانات وإدارة Segment Vault & Permit No</span>
-                    </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      محرك المعالجة والتدقيق الذاتي للتعرف على معرّفات القطاعات ورخص الحفر الوطنية وتعبئة الحقول المفقودة تلقائياً.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleRunPermitInspection}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                      title="البحث عن أنماط الرخص والمطابقة المكانية لتصاريح العمل"
-                    >
-                      <FileCheck className="h-4 w-4" />
-                      <span>فحص وتعبئة تصاريح الحفر 📜</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleRunSegmentVault}
-                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                      title="التصنيف الهيدروليكي الآلي وحافظة Segment Vault للمقاطع المتقاربة"
-                    >
-                      <Hash className="h-4 w-4" />
-                      <span>تأكيد Segment ID (Vault) ⚙️</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleRunFullFormatterPipeline}
-                      className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-black rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                      title="تشغيل محرك المعالجة الكامل لجميع الحقول والعناصر"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      <span>المحرك الكامل للتنسيق ⚡</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleExportFormatterExcel}
-                      className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                      title="تصدير جدول البيانات الشامل بصيغة إكسل Excel"
-                    >
-                      <FileSpreadsheet className="h-4 w-4" />
-                      <span>تصدير التقرير النهائي (Excel) 📊</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Explainer Cards according to user request */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Card 1: Segment ID Mechanism */}
-                  <div className="p-4 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/60 rounded-2xl space-y-3">
-                    <div className="flex items-center gap-2 border-b border-blue-200/60 dark:border-blue-900/40 pb-2">
-                      <span className="p-1.5 bg-blue-600 text-white rounded-lg text-xs font-black">1️⃣</span>
-                      <h5 className="font-extrabold text-blue-900 dark:text-blue-200 text-xs">آلية استخراج وقراءة Segment ID:</h5>
-                    </div>
-                    <ul className="text-[11px] text-slate-700 dark:text-slate-300 space-y-2 list-disc list-inside leading-relaxed">
-                      <li>
-                        <strong>التعرف الآلي (Header Matching):</strong> عند رفع ملف (Excel, DXF, KMZ, KML) يتم فحص حقول البيانات وأسماء طبقات CAD/GIS للتعرف على: <code className="bg-blue-100 dark:bg-blue-900 px-1 py-0.5 rounded text-blue-800 dark:text-blue-200 font-mono font-bold">Segment ID, Segment_ID, Segment, معرف القطاع, رقم المقطع, رقم السجمنت</code>.
-                      </li>
-                      <li>
-                        <strong>التصنيف الهيدروليكي الآلي (Geometrical Segmentation):</strong> في حال عدم وجود حقل صريح، يتم دمج القطع المتصلة هيدروليكياً ومكانياً وتوليد رمز موحد بالصيغة: <code className="bg-blue-100 dark:bg-blue-900 px-1 py-0.5 rounded font-mono font-bold text-blue-900 dark:text-blue-200">SEG-[القطر]-[النوع]-[تسلسلي]</code>.
-                      </li>
-                      <li>
-                        <strong>حافظة Segment Vault:</strong> تجميع الأنابيب والوصلات الفرعية المتقاربة ضمن نطاق التسامح (2m) وتعيين Segment ID موحد للأنابيب الرئيسية والفرعية التابعة لها.
-                      </li>
-                    </ul>
-                  </div>
-
-                  {/* Card 2: Permit No Mechanism */}
-                  <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 rounded-2xl space-y-3">
-                    <div className="flex items-center gap-2 border-b border-emerald-200/60 dark:border-emerald-900/40 pb-2">
-                      <span className="p-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black">2️⃣</span>
-                      <h5 className="font-extrabold text-emerald-900 dark:text-emerald-200 text-xs">آلية استخراج وقراءة Permit No (رقم تصريح الحفر):</h5>
-                    </div>
-                    <ul className="text-[11px] text-slate-700 dark:text-slate-300 space-y-2 list-disc list-inside leading-relaxed">
-                      <li>
-                        <strong>الاستخراج الرقمي (Pattern Extraction):</strong> مطابقة أنماط رخص الحفر الوطنية (أمانة الرياض، بلدي، NWC) للبحث عن أرقام من 8 إلى 12 رقمًا، أو البادئات القياسية: <code className="bg-emerald-100 dark:bg-emerald-900 px-1 py-0.5 rounded font-mono text-emerald-800 dark:text-emerald-200 font-bold">P-, PER-, 44, 45, 46, 2024-, 2025-</code>.
-                      </li>
-                      <li>
-                        <strong>المطابقة المكانية (Spatial Overlay & Geofencing):</strong> تقاطع مكاني آلي مع نطاقات ورخص العمل (Work Permits Boundaries) لمنح أي خط يقع داخل مضلع الرخصة رقم التصريح الخاص به تلقائياً.
-                      </li>
-                      <li>
-                        <strong>تعبئة وتحديث الحقول:</strong> يملأ الحقول المفقودة تلقائياً بالبيانات المستنتجة ويتيح تصدير التقرير النهائي لجميع العناصر.
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Table for Interactive Formatter */}
-                <div className="space-y-3">
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                    <div className="relative flex-1">
-                      <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="تصفية حسب Segment ID، رقم التصريح، أو اسم القطاع..."
-                        className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold pr-9 pl-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Filter className="h-4 w-4 text-slate-400" />
-                      <select
-                        value={selectedStatusFilter}
-                        onChange={(e) => setSelectedStatusFilter(e.target.value)}
-                        className="bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="all">جميع الحالات والخطوط</option>
-                        <option value="executed_water">{getStatusCategoryLabel('executed_water', activeProject?.name, analysisResult.projectScope)}</option>
-                        <option value="executed_sewage">{getStatusCategoryLabel('executed_sewage', activeProject?.name, analysisResult.projectScope)}</option>
-                        <option value="ongoing">{getStatusCategoryLabel('ongoing', activeProject?.name, analysisResult.projectScope)}</option>
-                        <option value="remaining">{getStatusCategoryLabel('remaining', activeProject?.name, analysisResult.projectScope)}</option>
-                        <option value="cancelled">{getStatusCategoryLabel('cancelled', activeProject?.name, analysisResult.projectScope)}</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
-                    <table className="w-full text-right text-xs">
-                      <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-black border-b border-slate-200 dark:border-slate-700">
-                        <tr>
-                          <th className="p-3">#</th>
-                          <th className="p-3">Segment ID (معرف القطاع)</th>
-                          <th className="p-3">Permit No (رقم التصريح)</th>
-                          <th className="p-3">اسم الخط / القطاع</th>
-                          <th className="p-3">حالة التنفيذ والبيان</th>
-                          <th className="p-3">القطر (مم)</th>
-                          <th className="p-3">الشارع / الحي</th>
-                          <th className="p-3">الطول (م)</th>
-                          <th className="p-3">تفاصيل</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {filteredItems.map((item, idx) => (
-                          <tr key={item.id || idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
-                            <td className="p-3 font-mono text-slate-400 font-bold">{idx + 1}</td>
-                            <td className="p-3">
-                              <div className="flex items-center gap-1.5">
-                                <input
-                                  type="text"
-                                  value={item.segmentId || ''}
-                                  onChange={(e) => handleUpdateItemSegmentOrPermit(item.id, 'segmentId', e.target.value)}
-                                  placeholder="SEG-..."
-                                  className="w-36 bg-blue-50/60 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 text-xs font-mono font-bold px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                                />
-                                {auditSegmentId(item.segmentId).hasLeadingDash && (
-                                  <span className="text-[10px] px-1 py-0.5 bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 rounded font-bold border border-amber-300 dark:border-amber-700" title="تنبيه: يحتوي على (-) قبل محتوى البيان">
-                                    ⚠️
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-3">
-                              <div className="flex items-center gap-1.5">
-                                <input
-                                  type="text"
-                                  value={item.permitNo || ''}
-                                  onChange={(e) => handleUpdateItemSegmentOrPermit(item.id, 'permitNo', e.target.value)}
-                                  placeholder="رقم الفسح..."
-                                  className="w-36 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 text-xs font-mono font-bold px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                                />
-                                {auditPermitNo(item.permitNo).isNonDigits && (
-                                  <span className="text-[10px] px-1 py-0.5 bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 rounded font-bold border border-amber-300 dark:border-amber-700" title="تنبيه: رقم الفسح يجب أن يحتوي على أرقام فقط وبدون فراغ أو (-)">
-                                    ⚠️
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-3 font-bold text-slate-800 dark:text-slate-200 max-w-xs truncate" title={item.name}>
-                              {item.name}
-                            </td>
-                            <td className="p-3">
-                              <span
-                                className="px-2.5 py-0.5 text-[10px] font-black rounded-full text-white shadow-3xs"
-                                style={{ backgroundColor: item.colorHex || '#2563eb' }}
-                              >
-                                {item.statusLabel || item.statusCategory}
-                              </span>
-                            </td>
-                            <td className="p-3 font-mono font-extrabold text-slate-700 dark:text-slate-300">
-                              {item.innerDiameter ? `${item.innerDiameter} مم` : '-'}
-                            </td>
-                            <td className="p-3 text-slate-600 dark:text-slate-400 font-bold">
-                              {item.streetName || item.district || '-'}
-                            </td>
-                            <td className="p-3 font-mono font-black text-slate-900 dark:text-slate-100">
-                              {item.lengthMeters.toLocaleString('ar-SA')} م
-                            </td>
-                            <td className="p-3">
-                              <button
-                                onClick={() => setSelectedFeatureForModal(item)}
-                                className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-bold rounded-lg border border-blue-200 dark:border-blue-800 transition-all flex items-center gap-1 cursor-pointer"
-                              >
-                                <MapPin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                                <span>إظهار</span>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-
-                        {filteredItems.length === 0 && (
-                          <tr>
-                            <td colSpan={9} className="p-8 text-center text-slate-400 dark:text-slate-500">
-                              لا يوجد نتائج مطابقة للبحث
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* TAB CONTENT: Color Compliance & Non-Compliant Codes Audit (فحص الألوان ومطابقة الأكواد المعتمدة) */}
             {activeAnalysisTab === 'colors' && (
               <div className="p-6 space-y-6">
@@ -2330,17 +2090,6 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {nonCompliantColorStats.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleAutoFixNonCompliantColors}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                      >
-                        <Wrench className="h-4 w-4" />
-                        <span>تصحيح ومطابقة جميع الألوان المخالفة تلقائياً ({nonCompliantColorStats.reduce((s, c) => s + c.count, 0)}) ⚡</span>
-                      </button>
-                    )}
-
                     <button
                       type="button"
                       onClick={() => {
@@ -2434,7 +2183,6 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                             <th className="p-3">إجمالي الطول (متر / كم)</th>
                             <th className="p-3">التصنيف واللون الأقرب المقترح</th>
                             <th className="p-3">نسبة الانحراف (ΔE)</th>
-                            <th className="p-3">إجراء التصحيح</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
@@ -2466,32 +2214,6 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                                 </div>
                               </td>
                               <td className="p-3 font-mono font-bold text-amber-600 dark:text-amber-400">{stat.distance}</td>
-                              <td className="p-3">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (!analysisResult) return;
-                                    const updatedItems = analysisResult.items.map(it => {
-                                      if (stat.itemIds.includes(it.id)) {
-                                        return {
-                                          ...it,
-                                          colorHex: stat.suggestedColor,
-                                          originalColorHex: stat.suggestedColor,
-                                          color: stat.suggestedColor
-                                        };
-                                      }
-                                      return it;
-                                    });
-                                    setAnalysisResult({ ...analysisResult, items: updatedItems });
-                                    setFeedbackMessage(`🎨 تم تصحيح اللون (${stat.colorHex}) إلى اللون المعتمد (${stat.suggestedColor}) بنجاح!`);
-                                    setTimeout(() => setFeedbackMessage(''), 5000);
-                                  }}
-                                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-bold text-xs rounded-lg border border-emerald-300 dark:border-emerald-800 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                                >
-                                  <Wrench className="w-3 h-3 text-emerald-600" />
-                                  <span>مطابقة هذا اللون</span>
-                                </button>
-                              </td>
                             </tr>
                           ))}
                         </tbody>
