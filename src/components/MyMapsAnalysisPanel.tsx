@@ -1437,27 +1437,27 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                   style={{ width: `${analysisResult.colorBreakdown.executed_water.percentage}%`, backgroundColor: '#01579B' }}
                   title={`${getStatusCategoryLabel('executed_water', activeProject?.name, analysisResult.projectScope)}: ${analysisResult.colorBreakdown.executed_water.percentage}%`}
                   className="h-full transition-all duration-500"
-                />
+                ></div>
                 <div
                   style={{ width: `${analysisResult.colorBreakdown.executed_sewage.percentage}%`, backgroundColor: '#097138' }}
                   title={`${getStatusCategoryLabel('executed_sewage', activeProject?.name, analysisResult.projectScope)}: ${analysisResult.colorBreakdown.executed_sewage.percentage}%`}
                   className="h-full transition-all duration-500"
-                />
+                ></div>
                 <div
                   style={{ width: `${analysisResult.colorBreakdown.ongoing.percentage}%`, backgroundColor: '#ffea00' }}
                   title={`${getStatusCategoryLabel('ongoing', activeProject?.name, analysisResult.projectScope)}: ${analysisResult.colorBreakdown.ongoing.percentage}%`}
                   className="h-full transition-all duration-500"
-                />
+                ></div>
                 <div
                   style={{ width: `${analysisResult.colorBreakdown.remaining.percentage}%`, backgroundColor: '#a52714' }}
                   title={`${getStatusCategoryLabel('remaining', activeProject?.name, analysisResult.projectScope)}: ${analysisResult.colorBreakdown.remaining.percentage}%`}
                   className="h-full transition-all duration-500"
-                />
+                ></div>
                 <div
                   style={{ width: `${analysisResult.colorBreakdown.cancelled.percentage}%`, backgroundColor: '#F48FB1' }}
                   title={`${getStatusCategoryLabel('cancelled', activeProject?.name, analysisResult.projectScope)}: ${analysisResult.colorBreakdown.cancelled.percentage}%`}
                   className="h-full transition-all duration-500"
-                />
+                ></div>
               </div>
             </div>
           </div>
@@ -2460,6 +2460,9 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
 
       {/* Previous Project Reports Section */}
       {activeProject && (
