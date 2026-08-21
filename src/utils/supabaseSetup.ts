@@ -27,8 +27,14 @@ const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const LIGHTWEIGHT_REPORT_COLUMNS = 'id, project_id, project_name, map_url, total_length_meters, total_length_km, total_features_count, color_breakdown, parsed_at, created_at, yellow_no_permit_count, yellow_no_permit_meters, yellow_no_permit_km, red_no_segment_count, red_no_segment_meters, red_no_segment_km';
 
 function mapRowToHistoricalReport(row: any): HistoricalReport {
-  const colorBreakdown = row.color_breakdown || {};
-  const rawItems = Array.isArray(row.items) ? row.items : [];
+  let colorBreakdown = row.color_breakdown || {};
+  if (typeof colorBreakdown === 'string') {
+    try { colorBreakdown = JSON.parse(colorBreakdown); } catch (e) { colorBreakdown = {}; }
+  }
+  let rawItems = Array.isArray(row.items) ? row.items : [];
+  if (typeof row.items === 'string') {
+    try { rawItems = JSON.parse(row.items); } catch (e) { rawItems = []; }
+  }
 
   // Sanitize each item strictly using the latest parsing & cleaning rules
   const sanitizedItems = rawItems.map((item: any) => {
@@ -220,13 +226,17 @@ function mapRowToHistoricalReport(row: any): HistoricalReport {
 }
 
 function mapRowToChangelogRecord(row: any): ProjectChangelogRecord {
+  let diff = row.diff;
+  if (typeof diff === 'string') {
+    try { diff = JSON.parse(diff); } catch (e) { }
+  }
   return {
     id: String(row.id),
     projectId: Number(row.project_id),
     projectName: row.project_name || '',
     reportId: row.report_id ? String(row.report_id) : '',
     previousReportId: row.previous_report_id ? String(row.previous_report_id) : null,
-    diff: row.diff,
+    diff: diff,
     createdAt: row.created_at || new Date().toISOString(),
     isViewed: Boolean(row.is_viewed)
   };
