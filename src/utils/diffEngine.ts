@@ -227,12 +227,16 @@ export function compareKMLAnalyses(
   // Check Stage property on yellow lines (ongoing status category)
   const yellowLineStageChanges: YellowLineStageChange[] = [];
 
-  const oldOngoingList = (oldResult.items || []).filter(
-    (it) => it.statusCategory === 'ongoing' || it.colorHex?.toLowerCase() === '#ffea00'
-  );
+  const isOngoingItem = (it: any) =>
+    it.statusCategory === 'ongoing' ||
+    it.colorHex?.toLowerCase() === '#ffea00' ||
+    it.color?.toLowerCase() === '#ffea00' ||
+    it.originalColorHex?.toLowerCase() === '#ffea00';
+
+  const oldOngoingList = (oldResult.items || []).filter(isOngoingItem);
 
   (newResult.items || [])
-    .filter((it) => it.statusCategory === 'ongoing' || it.colorHex?.toLowerCase() === '#ffea00')
+    .filter(isOngoingItem)
     .forEach((newItem) => {
       // Find matching old item by:
       // 1. segmentId (if valid)

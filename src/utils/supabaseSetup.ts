@@ -41,16 +41,21 @@ function mapRowToHistoricalReport(row: any): HistoricalReport {
     if (!item || typeof item !== 'object') return item;
     const cleanPerm = cleanPermitNo(item.permitNo || item.permit_no || item['Permit No']);
     const cleanSeg = cleanSegmentId(item.segmentId || item.segment_id || item['Segment ID']);
-    const statusCat = item.statusCategory || item.status_category || (item.colorHex === '#ffea00' || item.color_hex === '#ffea00' ? 'ongoing' : 'ongoing');
     const colHex = item.colorHex || item.color_hex || item.color || '#ffea00';
+    const originalColHex = item.originalColorHex || colHex;
+    const statusCat = item.statusCategory || item.status_category || (colHex.toLowerCase() === '#ffea00' ? 'ongoing' : (colHex.toLowerCase() === '#01579b' ? 'executed_water' : (colHex.toLowerCase() === '#097138' ? 'executed_sewage' : (colHex.toLowerCase() === '#f48fb1' ? 'cancelled' : 'remaining'))));
     const lenMeters = Number(item.lengthMeters || item.length_meters || item.length || 0);
     const lenKm = Number(item.lengthKm || item.length_km || (lenMeters / 1000).toFixed(3));
+    const itemStage = cleanStage(item.stage || item.Stage || item.stage_name || '');
     return {
       ...item,
       permitNo: cleanPerm,
       segmentId: cleanSeg,
       statusCategory: statusCat,
       colorHex: colHex,
+      originalColorHex: originalColHex,
+      color: colHex,
+      stage: itemStage,
       lengthMeters: lenMeters,
       lengthKm: lenKm
     };
@@ -244,24 +249,32 @@ function mapRowToChangelogRecord(row: any): ProjectChangelogRecord {
 
 function sanitizeItemsForStorage(items: any[]): any[] {
   if (!Array.isArray(items)) return [];
-  // 🚀 Keep only essential tabular fields to prevent multi-megabyte JSON payloads
+  // 🚀 Keep all required tabular, analysis and diff fields
   return items.map(item => {
     if (!item || typeof item !== 'object') return item;
+    const colHex = item.colorHex || item.color || '#A52714';
+    const originalColHex = item.originalColorHex || colHex;
+    const itemStage = cleanStage(item.stage || item.Stage || item.stage_name || '');
     return {
       id: item.id,
       name: item.name || '',
-      segmentId: item.segmentId || '',
-      permitNo: item.permitNo || '',
+      segmentId: cleanSegmentId(item.segmentId) || '',
+      permitNo: cleanPermitNo(item.permitNo) || '',
       lengthMeters: Number(item.lengthMeters || 0),
       lengthKm: Number(item.lengthKm || 0),
       statusCategory: item.statusCategory || 'remaining',
-      color: item.color || '#A52714',
+      color: colHex,
+      colorHex: colHex,
+      originalColorHex: originalColHex,
+      stage: itemStage,
       statusLabel: item.statusLabel || '',
       innerDiameter: item.innerDiameter || '',
       streetName: item.streetName || '',
       district: item.district || '',
+      zone: item.zone || '',
       drillingType: item.drillingType || '',
       contractor: item.contractor || '',
+      googleMapsUrl: item.googleMapsUrl || '',
       centerLat: item.centerLat,
       centerLng: item.centerLng
     };
