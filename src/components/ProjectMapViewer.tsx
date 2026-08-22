@@ -584,7 +584,7 @@ export function ProjectMapViewer({
         center: [24.4, 46.4],
         zoom: 7,
         zoomControl: true,
-        attributionControl: true,
+        attributionControl: false,
         tap: !L.Browser.mobile,
         dragging: isMapUnlocked,
         touchZoom: isMapUnlocked,
@@ -595,7 +595,7 @@ export function ProjectMapViewer({
       // Add high-performance public OpenStreetMap tiles
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+        attribution: ''
       }).addTo(mapInstanceRef.current);
 
       // Register map click listener for dynamic localization edit
@@ -1224,9 +1224,9 @@ export function ProjectMapViewer({
           style={{ minHeight: '100%' }}
         />
 
-        {/* Floating map classification legend block */}
+        {/* Floating map classification legend block - Docked cleanly at the bottom corner */}
         {isLeafletReady && mapMode === 'osm' && (
-          <div className={`absolute bottom-3 ${isRtl ? 'right-3' : 'left-3'} z-[999] max-w-[calc(100%-24px)] sm:max-w-[380px] max-h-[85%]`} dir={isRtl ? 'rtl' : 'ltr'}>
+          <div className={`absolute bottom-1.5 ${isRtl ? 'right-1.5' : 'left-1.5'} z-[1000] max-w-[calc(100%-12px)] sm:max-w-[390px] max-h-[calc(100%-12px)] select-none`} dir={isRtl ? 'rtl' : 'ltr'}>
             {!isLegendExpanded ? (
               <button
                 type="button"
@@ -1237,7 +1237,7 @@ export function ProjectMapViewer({
                   }
                 }}
                 title={t('legend.title')}
-                className="px-3.5 py-2 rounded-xl bg-white/95 dark:bg-slate-900/95 hover:bg-white dark:hover:bg-slate-900 border border-slate-200/85 dark:border-slate-800 shadow-xl flex items-center gap-2 text-blue-600 dark:text-blue-400 transition-all active:scale-95 hover:scale-105 cursor-pointer font-extrabold text-xs"
+                className="px-3.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 shadow-md flex items-center gap-2 text-blue-600 dark:text-blue-400 transition-all active:scale-95 hover:scale-102 cursor-pointer font-extrabold text-xs"
               >
                 <Key className="h-4 w-4 text-amber-500 animate-pulse" />
                 <span>{t('map.legendButton')}</span>

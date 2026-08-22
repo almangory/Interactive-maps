@@ -58,7 +58,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({
 
   return (
     <div
-      className={`bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl transition-all duration-200 ${isRtl ? 'text-right' : 'text-left'} font-sans ${className}`}
+      className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl transition-all duration-200 ${isRtl ? 'text-right' : 'text-left'} font-sans ${className}`}
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       {/* Header bar */}
