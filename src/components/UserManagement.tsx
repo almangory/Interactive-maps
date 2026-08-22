@@ -356,7 +356,12 @@ export function UserManagement({
         [field]: ['الكل']
       };
       if (field === 'allowedScopes') {
-        nextData.allowedLayers = ['water', 'sewage', 'materials'];
+        const isLayersActive = (formData.allowedTabs || []).includes('layers');
+        if (isLayersActive) {
+          nextData.allowedLayers = ['water', 'sewage', 'materials'];
+        } else {
+          nextData.allowedLayers = [];
+        }
       }
     } else {
       let newList = list.filter(item => item !== 'الكل');
@@ -376,12 +381,17 @@ export function UserManagement({
       };
 
       if (field === 'allowedScopes') {
-        if (newList.includes('الكل') || (newList.includes('مياه') && newList.includes('صرف صحي'))) {
-          nextData.allowedLayers = ['water', 'sewage', 'materials'];
-        } else if (newList.includes('مياه')) {
-          nextData.allowedLayers = ['water', 'materials'];
-        } else if (newList.includes('صرف صحي')) {
-          nextData.allowedLayers = ['sewage', 'materials'];
+        const isLayersActive = (formData.allowedTabs || []).includes('layers');
+        if (isLayersActive) {
+          if (newList.includes('الكل') || (newList.includes('مياه') && newList.includes('صرف صحي'))) {
+            nextData.allowedLayers = ['water', 'sewage', 'materials'];
+          } else if (newList.includes('مياه')) {
+            nextData.allowedLayers = ['water', 'materials'];
+          } else if (newList.includes('صرف صحي')) {
+            nextData.allowedLayers = ['sewage', 'materials'];
+          }
+        } else {
+          nextData.allowedLayers = [];
         }
       }
     }
@@ -519,6 +529,9 @@ export function UserManagement({
       finalProjectIds = finalProjectIds.filter(id => eligibleIds.has(id));
     }
 
+    const isLayersActive = (formData.allowedTabs || []).includes('layers');
+    const isStatsActive = (formData.allowedTabs || []).includes('stats');
+
     const savedUser: User = {
       id: formData.id || `user_${Date.now()}`,
       username: emailInput,
@@ -530,8 +543,8 @@ export function UserManagement({
       
       // Strict IAM fields mapping
       allowedTabs: formData.allowedTabs || ['maps', 'stats', 'layers'],
-      allowedLayers: formData.allowedLayers || ['water', 'sewage', 'materials'],
-      allowedStatsSubTabs: formData.allowedStatsSubTabs || ['lengths', 'mymaps', 'general'],
+      allowedLayers: isLayersActive ? (formData.allowedLayers && formData.allowedLayers.length > 0 ? formData.allowedLayers : ['water', 'sewage', 'materials']) : [],
+      allowedStatsSubTabs: isStatsActive ? (formData.allowedStatsSubTabs && formData.allowedStatsSubTabs.length > 0 ? formData.allowedStatsSubTabs : ['lengths', 'mymaps', 'general']) : [],
       canOpenExternalLinks: formData.canOpenExternalLinks !== false,
       canFilter: formData.canFilter !== false,
       canInsert: formData.canInsert !== false,
@@ -1630,11 +1643,22 @@ export function UserManagement({
                       {t('users.allowedLayers')}:
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {((selectedUser.allowedLayers && selectedUser.allowedLayers.length > 0) ? selectedUser.allowedLayers : ['water', 'sewage', 'materials']).map(l => (
-                        <span key={l} className="px-2 py-0.5 bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-200/60 dark:border-amber-900 rounded text-[10px] font-bold">
-                          {l === 'water' ? (language === 'en' ? '💧 Water' : '💧 المياه') : l === 'sewage' ? (language === 'en' ? '🌿 Sewage' : '🌿 الصرف الصحي') : l === 'materials' ? (language === 'en' ? '📦 Materials' : '📦 مواد التشوين') : l}
-                        </span>
-                      ))}
+                      {(() => {
+                        const hasLayersTab = (selectedUser.allowedTabs || []).includes('layers');
+                        const layersList = hasLayersTab ? (selectedUser.allowedLayers || []) : [];
+                        if (hasLayersTab && layersList.length > 0) {
+                          return layersList.map(l => (
+                            <span key={l} className="px-2 py-0.5 bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-200/60 dark:border-amber-900 rounded text-[10px] font-bold">
+                              {l === 'water' ? (language === 'en' ? '💧 Water' : '💧 المياه') : l === 'sewage' ? (language === 'en' ? '🌿 Sewage' : '🌿 الصرف الصحي') : l === 'materials' ? (language === 'en' ? '📦 Materials' : '📦 مواد التشوين') : l}
+                            </span>
+                          ));
+                        }
+                        return (
+                          <span className="text-rose-600 dark:text-rose-400 font-bold bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded border border-rose-200 dark:border-rose-900 text-[10px]">
+                            🔒 {language === 'en' ? 'Disabled (No tab access)' : 'معطلة (لا تتوفر صلاحية للتبويب)'}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -1644,11 +1668,22 @@ export function UserManagement({
                       {t('users.allowedStatsSubTabs')}:
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {((selectedUser.allowedStatsSubTabs && selectedUser.allowedStatsSubTabs.length > 0) ? selectedUser.allowedStatsSubTabs : ['lengths', 'mymaps', 'general']).map(s => (
-                        <span key={s} className="px-2 py-0.5 bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 border border-blue-200/60 dark:border-blue-900 rounded text-[10px] font-bold">
-                          {s === 'lengths' ? (language === 'en' ? '📏 Lengths & Permits' : '📏 حصر الأطوال والرخص') : s === 'mymaps' ? (language === 'en' ? '📊 My Maps' : '📊 تحليل My Maps') : s === 'general' ? (language === 'en' ? '📈 General Stats' : '📈 الإحصائيات العامة') : s}
-                        </span>
-                      ))}
+                      {(() => {
+                        const hasStatsTab = (selectedUser.allowedTabs || []).includes('stats');
+                        const statsList = hasStatsTab ? (selectedUser.allowedStatsSubTabs || []) : [];
+                        if (hasStatsTab && statsList.length > 0) {
+                          return statsList.map(s => (
+                            <span key={s} className="px-2 py-0.5 bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 border border-blue-200/60 dark:border-blue-900 rounded text-[10px] font-bold">
+                              {s === 'lengths' ? (language === 'en' ? '📏 Lengths & Permits' : '📏 حصر الأطوال والرخص') : s === 'mymaps' ? (language === 'en' ? '📊 My Maps' : '📊 تحليل My Maps') : s === 'general' ? (language === 'en' ? '📈 General Stats' : '📈 الإحصائيات العامة') : s}
+                            </span>
+                          ));
+                        }
+                        return (
+                          <span className="text-rose-600 dark:text-rose-400 font-bold bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded border border-rose-200 dark:border-rose-900 text-[10px]">
+                            🔒 {language === 'en' ? 'Disabled (No tab access)' : 'معطلة (لا تتوفر صلاحية للتبويب)'}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
