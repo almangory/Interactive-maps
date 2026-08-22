@@ -119,35 +119,45 @@ export function ProjectModal({ isOpen, project, onClose, onSave }: ProjectModalP
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.operationalNumber) {
+    if (!formData.name?.trim() || !formData.operationalNumber?.trim()) {
       setError(t('projModal.validationError', 'الرجاء تعبئة اسم المشروع والرقم التشغيلي للمطابقة التنظيمية'));
       return;
     }
 
-    if (formData.mapUrl && !formData.mapUrl.startsWith('http')) {
-      setError(t('projModal.urlError', 'رابط الخريطة يجب أن يكون رابطاً صالحاً يبدأ بـ http:// أو https://'));
-      return;
+    // Clean map URL from whitespaces, invisible directional unicode marks (LRM/RLM/PDF), newlines, and auto-format
+    let cleanMapUrl = (formData.mapUrl || '').trim();
+    cleanMapUrl = cleanMapUrl.replace(/[\u200B-\u200D\uFEFF\u200E\u200F\u202A-\u202E\s]/g, '').trim();
+
+    if (cleanMapUrl) {
+      if (!cleanMapUrl.startsWith('http://') && !cleanMapUrl.startsWith('https://')) {
+        if (cleanMapUrl.startsWith('www.') || cleanMapUrl.includes('google.com') || cleanMapUrl.includes('maps/')) {
+          cleanMapUrl = `https://${cleanMapUrl}`;
+        } else {
+          setError(t('projModal.urlError', 'رابط الخريطة يجب أن يكون رابطاً صالحاً يبدأ بـ http:// أو https://'));
+          return;
+        }
+      }
     }
 
     const savedProject: Project = {
       id: project ? project.id : Math.floor(Math.random() * 900000) + 100000,
-      operationalNumber: formData.operationalNumber || '',
-      name: formData.name || '',
-      po: formData.po || '',
-      unifierNo: formData.unifierNo || '',
-      contractor: formData.contractor || '',
-      consultant: formData.consultant || '',
+      operationalNumber: (formData.operationalNumber || '').trim(),
+      name: (formData.name || '').trim(),
+      po: (formData.po || '').trim(),
+      unifierNo: (formData.unifierNo || '').trim(),
+      contractor: (formData.contractor || '').trim(),
+      consultant: (formData.consultant || '').trim(),
       status: formData.status || 'جاري',
       scope: formData.scope || 'صرف صحي',
       classification: formData.classification || 'شبكات',
       businessUnit: formData.businessUnit || 'وحدة أعمال الرياض',
       region: formData.region || 'شمال الرياض',
       subProgram: formData.subProgram || '',
-      mapUrl: formData.mapUrl || '',
+      mapUrl: cleanMapUrl,
       x: formData.x !== undefined && formData.x !== null && formData.x !== ('' as any) && !isNaN(Number(formData.x)) ? Number(formData.x) : null,
       y: formData.y !== undefined && formData.y !== null && formData.y !== ('' as any) && !isNaN(Number(formData.y)) ? Number(formData.y) : null,
-      surveyorName: formData.surveyorName || '',
-      surveyorPhone: formData.surveyorPhone || '',
+      surveyorName: (formData.surveyorName || '').trim(),
+      surveyorPhone: (formData.surveyorPhone || '').trim(),
     };
 
     onSave(savedProject);
@@ -369,11 +379,15 @@ export function ProjectModal({ isOpen, project, onClose, onSave }: ProjectModalP
             <div className="space-y-1 sm:col-span-2">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300">{t('projModal.mapUrl', 'رابط خريطة قوقل التفاعلية (Google My Maps URL)')}</label>
               <input
-                type="url"
+                type="text"
                 placeholder="https://www.google.com/maps/d/viewer?mid=..."
                 className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white font-mono"
                 value={formData.mapUrl || ''}
-                onChange={e => setFormData({ ...formData, mapUrl: e.target.value })}
+                onChange={e => {
+                  const cleaned = e.target.value.replace(/[\u200B-\u200D\uFEFF\u200E\u200F\u202A-\u202E]/g, '');
+                  setFormData({ ...formData, mapUrl: cleaned });
+                  if (error) setError('');
+                }}
               />
               <span className="text-[10px] text-slate-400 block">
                 {t('projModal.mapUrlHint', 'يقبل روابط خريطة قوقل للتحرير (My Maps edit) أو العرض (My Maps viewer). يقوم النظام بفلترتها وعرضها بآمان.')}
