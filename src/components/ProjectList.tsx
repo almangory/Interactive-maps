@@ -136,57 +136,63 @@ export function ProjectList({
     <div className="space-y-4">
       {/* Search and Filters Toggle Bar */}
       {currentUser.canFilter !== false ? (
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs space-y-3 transition-colors">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className={`absolute ${isRtl ? 'right-3' : 'left-3'} top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500`} />
-              <input
-                type="text"
-                placeholder={t('list.searchPlaceholder')}
-                className={`w-full text-xs ${isRtl ? 'pr-10 pl-10 text-right' : 'pl-10 pr-10 text-left'} py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500`}
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
+        <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs space-y-2.5 transition-colors">
+          {/* Row 1: Full-width spacious search input */}
+          <div className="relative w-full">
+            <Search className={`absolute ${isRtl ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none`} />
+            <input
+              type="text"
+              placeholder={t('list.searchPlaceholder')}
+              className={`w-full text-xs ${isRtl ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 shadow-2xs transition-all`}
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+            <div className={`absolute ${isRtl ? 'left-1.5' : 'right-1.5'} top-1/2 -translate-y-1/2 flex items-center`}>
+              <VoiceSearchButton
+                size="sm"
+                onSpeechResult={(text) => setSearchTerm(text)}
+                placeholderHint={t('list.voiceSearchPrompt')}
               />
-              <div className={`absolute ${isRtl ? 'left-1.5' : 'right-1.5'} top-1/2 -translate-y-1/2 flex items-center`}>
-                <VoiceSearchButton
-                  size="sm"
-                  onSpeechResult={(text) => setSearchTerm(text)}
-                  placeholderHint={t('list.voiceSearchPrompt')}
-                />
-              </div>
             </div>
+          </div>
+
+          {/* Row 2: Equal-spaced 3-column action buttons grid */}
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setIsExecutiveSummaryOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-indigo-950/60 border-blue-200 dark:border-indigo-800 text-blue-800 dark:text-blue-300 hover:from-blue-100 hover:to-indigo-100 shadow-3xs"
+              className="flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl border text-[11px] font-bold cursor-pointer transition-all bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-indigo-950/60 border-blue-200 dark:border-indigo-800 text-blue-800 dark:text-blue-300 hover:from-blue-100 hover:to-indigo-100 shadow-3xs active:scale-98"
               title="عرض تقرير التغيرات المجمع لجميع المشاريع وتصدير Excel"
             >
-              <FileSpreadsheet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span className="hidden md:inline">تقرير التغيرات الأسبوعي 📑</span>
+              <FileSpreadsheet className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span className="truncate">تقرير التغيرات 📑</span>
             </button>
+
             <button
               type="button"
               onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
-              className={`flex items-center gap-1.5 px-3.5 rounded-xl border text-xs font-semibold cursor-pointer transition-colors ${
+              className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl border text-[11px] font-bold cursor-pointer transition-all active:scale-98 ${
                 showOnlyFavorites
                   ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 shadow-3xs'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80'
               }`}
               title={t('list.favoritesOnlyTooltip')}
             >
-              <Star className={`h-4 w-4 ${showOnlyFavorites ? 'fill-amber-500 text-amber-500' : 'text-slate-400'}`} />
-              <span className="hidden sm:inline">{t('list.favoritesOnly')}</span>
+              <Star className={`h-3.5 w-3.5 shrink-0 ${showOnlyFavorites ? 'fill-amber-500 text-amber-500' : 'text-slate-400'}`} />
+              <span className="truncate">{t('list.favoritesOnly')}</span>
             </button>
+
             <button
+              type="button"
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3.5 rounded-xl border text-xs font-semibold cursor-pointer transition-colors ${
+              className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl border text-[11px] font-bold cursor-pointer transition-all active:scale-98 ${
                 showFilters || selectedSubProgram !== 'الكل' || selectedClassification !== 'الكل' || selectedStatus !== 'الكل' || showOnlyFavorites
-                  ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                  ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 shadow-3xs'
+                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80'
               }`}
             >
-              <SlidersHorizontal className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('list.filterTools')}</span>
+              <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{t('list.filterTools')}</span>
             </button>
           </div>
 
