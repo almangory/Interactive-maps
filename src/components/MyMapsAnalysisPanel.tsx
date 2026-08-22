@@ -75,7 +75,12 @@ import {
   StopCircle,
   Palette,
   ShieldCheck,
-  Wrench
+  Wrench,
+  Scale,
+  Ban,
+  CheckCircle,
+  UploadCloud,
+  FileDown
 } from 'lucide-react';
 import { PermitLengthChart } from './PermitLengthChart';
 import { SegmentLengthChart } from './SegmentLengthChart';
@@ -85,6 +90,13 @@ import {
   APPROVED_NWC_COLORS,
   NonCompliantColorSummary 
 } from '../utils/colorCompliance';
+import { PlatformSegment, SegmentReconciliationSummary } from '../types';
+import { 
+  fetchPlatformSegmentsForProject, 
+  reconcileProjectSegments, 
+  isSegmentStatusCancelled 
+} from '../utils/platformSegmentsService';
+import { PlatformSegmentsImportModal } from './PlatformSegmentsImportModal';
 
 interface MyMapsAnalysisPanelProps {
   projects: Project[];
@@ -99,10 +111,17 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [projectSearchTerm, setProjectSearchTerm] = useState<string>('');
   const [analysisResult, setAnalysisResult] = useState<KMLAnalysisResult | null>(null);
-  const [activeAnalysisTab, setActiveAnalysisTab] = useState<'overview' | 'segments' | 'permits' | 'lines' | 'formatter' | 'colors'>('overview');
+  const [activeAnalysisTab, setActiveAnalysisTab] = useState<'overview' | 'segments' | 'permits' | 'lines' | 'formatter' | 'colors' | 'reconciliation'>('overview');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [feedbackMessage, setFeedbackMessage] = useState<string>('');
+
+  // Platform Segments Reconciliation State
+  const [platformSegments, setPlatformSegments] = useState<PlatformSegment[]>([]);
+  const [isLoadingPlatformSegments, setIsLoadingPlatformSegments] = useState<boolean>(false);
+  const [isExcelImportModalOpen, setIsExcelImportModalOpen] = useState<boolean>(false);
+  const [reconciliationFilter, setReconciliationFilter] = useState<'all' | 'missing' | 'cancelled' | 'compliant'>('all');
+  const [reconciliationSearch, setReconciliationSearch] = useState<string>('');
 
   // Segment & Permit Region Interactive Map Modal State
   const [isRegionsMapModalOpen, setIsRegionsMapModalOpen] = useState<boolean>(false);
@@ -156,6 +175,42 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
     if (!analysisResult || !analysisResult.items) return [];
     return auditNonCompliantColors(analysisResult.items);
   }, [analysisResult]);
+
+  // Load Platform Segments for the active project from Neon PostgreSQL
+  const refreshPlatformSegments = React.useCallback(() => {
+    if (!activeProject) {
+      setPlatformSegments([]);
+      return;
+    }
+    setIsLoadingPlatformSegments(true);
+    fetchPlatformSegmentsForProject(activeProject.po, activeProject.name)
+      .then(segs => {
+        setPlatformSegments(segs || []);
+      })
+      .catch(err => {
+        console.error('Failed to load platform segments:', err);
+        setPlatformSegments([]);
+      })
+      .finally(() => {
+        setIsLoadingPlatformSegments(false);
+      });
+  }, [activeProject?.id, activeProject?.po, activeProject?.name]);
+
+  useEffect(() => {
+    refreshPlatformSegments();
+  }, [refreshPlatformSegments]);
+
+  // Compute Infrastructure Platform Reconciliation Summary
+  const reconciliationSummary: SegmentReconciliationSummary = React.useMemo(() => {
+    const items = analysisResult?.items || [];
+    return reconcileProjectSegments(
+      platformSegments, 
+      items, 
+      activeProject?.po || '', 
+      activeProject?.name || ''
+    );
+  }, [platformSegments, analysisResult, activeProject?.po, activeProject?.name]);
+
 
   const handleUpdateItemSegmentOrPermit = (itemId: string, field: 'segmentId' | 'permitNo', value: string) => {
     if (!analysisResult) return;
@@ -995,6 +1050,37 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
 
               <button
                 type="button"
+                onClick={() => setActiveAnalysisTab('reconciliation')}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md border ${
+                  reconciliationSummary.totalMissingCount > 0
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/40 animate-pulse'
+                    : reconciliationSummary.totalCancelledOnMapCount > 0
+                    ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-400/40'
+                    : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400/30'
+                }`}
+                title="مطابقة قطاعات منصة البنية التحتية مع الخريطة التفاعلية"
+              >
+                <Scale className="h-3.5 w-3.5" />
+                <span>
+                  مطابقة البنية التحتية
+                  {reconciliationSummary.totalMissingCount > 0 && ` (${reconciliationSummary.totalMissingCount} مفقود ⚠️)`}
+                  {reconciliationSummary.totalMissingCount === 0 && reconciliationSummary.totalCancelledOnMapCount > 0 && ` (${reconciliationSummary.totalCancelledOnMapCount} ملغي 🚫)`}
+                  {reconciliationSummary.totalMissingCount === 0 && reconciliationSummary.totalCancelledOnMapCount === 0 && platformSegments.length > 0 && ' ✅'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsExcelImportModalOpen(true)}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-indigo-500/40 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+                title="استيراد وتحديث ملف الإكسل المعتمد من منصة البنية التحتية (Segment ID.xlsx)"
+              >
+                <UploadCloud className="h-3.5 w-3.5 text-cyan-400" />
+                <span>استيراد إكسل 📥</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveAnalysisTab('segments')}
                 className="px-3 py-1.5 bg-blue-600/90 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shadow-md cursor-pointer border border-blue-400/30"
                 title="عرض وتصنيف معرفات قطاعات العمل Segment ID"
@@ -1190,6 +1276,82 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                 </div>
               </div>
             </div>
+
+            {/* ⚖️ Infrastructure Reconciliation Alert Card 1: Missing Segments to Add */}
+            {reconciliationSummary.totalMissingCount > 0 && (
+              <div className="p-4 rounded-2xl border-2 border-rose-600 bg-gradient-to-r from-rose-50 via-rose-100/80 to-red-50 dark:from-rose-950/80 dark:via-rose-900/60 dark:to-slate-900 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in duration-300">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-rose-700 text-white flex items-center justify-center shrink-0 shadow-lg shadow-rose-900/40 animate-pulse mt-0.5">
+                    <Scale className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-0.5 bg-rose-700 text-white text-[11px] font-black rounded-full shadow-xs">
+                        تنبيه مطابقة البنية التحتية (قطاعات مفقودة) ⚠️
+                      </span>
+                      <span className="text-xs font-bold text-rose-950 dark:text-rose-200">
+                        تم رصد قطاعات معتمدة في منصة البنية التحتية لم يتم إسقاطها على خريطة المشروع!
+                      </span>
+                    </div>
+                    <p className="text-xs text-rose-900 dark:text-rose-300 font-semibold leading-relaxed">
+                      عدد القطاعات المفقودة: <strong className="font-mono text-sm text-rose-950 dark:text-white font-black underline">{reconciliationSummary.totalMissingCount} قطاع</strong> | إجمالي طولها المعتمد: <strong className="font-mono text-sm text-rose-950 dark:text-white font-black">{(reconciliationSummary.totalMissingLengthMeters / 1000).toFixed(3)} كم</strong> ({reconciliationSummary.totalMissingLengthMeters.toLocaleString('ar-SA')} متر)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReconciliationFilter('missing');
+                      setActiveAnalysisTab('reconciliation');
+                    }}
+                    className="px-4 py-2.5 bg-rose-700 hover:bg-rose-800 text-white font-black text-xs rounded-xl shadow-lg shadow-rose-900/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 border border-rose-400/40"
+                  >
+                    <Scale className="h-4 w-4 text-rose-200" />
+                    <span>معاينة وتصدير النواقص ({reconciliationSummary.totalMissingCount}) 📋</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 🚫 Infrastructure Reconciliation Alert Card 2: Cancelled Segments Still on Map */}
+            {reconciliationSummary.totalCancelledOnMapCount > 0 && (
+              <div className="p-4 rounded-2xl border-2 border-amber-600 bg-gradient-to-r from-amber-50 via-amber-100/80 to-orange-50 dark:from-amber-950/80 dark:via-amber-900/60 dark:to-slate-900 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in duration-300">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-amber-600/30 animate-pulse mt-0.5">
+                    <Ban className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-0.5 bg-amber-600 text-white text-[11px] font-black rounded-full shadow-xs">
+                        تنبيه رقابي: قطاعات ملغاة بالمنصة ومرسومة بالخريطة 🚫
+                      </span>
+                      <span className="text-xs font-bold text-amber-950 dark:text-amber-200">
+                        حالة هذه القطاعات في منصة البنية التحتية (ملغي / بانتظار الإلغاء) ولكنها لا تزال موجودة بالخريطة ويجب إزالتها!
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-900 dark:text-amber-300 font-semibold leading-relaxed">
+                      عدد القطاعات الملغاة المرصودة: <strong className="font-mono text-sm text-amber-950 dark:text-white font-black underline">{reconciliationSummary.totalCancelledOnMapCount} قطاع</strong> | إجمالي طولها: <strong className="font-mono text-sm text-amber-950 dark:text-white font-black">{(reconciliationSummary.totalCancelledOnMapLengthMeters / 1000).toFixed(3)} كم</strong> ({reconciliationSummary.totalCancelledOnMapLengthMeters.toLocaleString('ar-SA')} متر)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReconciliationFilter('cancelled');
+                      setActiveAnalysisTab('reconciliation');
+                    }}
+                    className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow-lg shadow-amber-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 border border-amber-400/40"
+                  >
+                    <Ban className="h-4 w-4 text-amber-100" />
+                    <span>معاينة القطاعات الواجب حذفها ({reconciliationSummary.totalCancelledOnMapCount}) 🗑️</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Crimson Alert Card: Yellow Ongoing Items Lacking Permit Number (#ffea00) */}
             {yellowNoPermitStats.count > 0 && (
@@ -1431,6 +1593,32 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
               >
                 <Ruler className="h-4 w-4" />
                 <span>4- تفاصيل الخطوط وحصر الأطوال 📏</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveAnalysisTab('reconciliation')}
+                className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeAnalysisTab === 'reconciliation'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                }`}
+              >
+                <Scale className="h-4 w-4" />
+                <span>5- مطابقة البنية التحتية ⚖️</span>
+                {reconciliationSummary.totalMissingCount > 0 && (
+                  <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                    {reconciliationSummary.totalMissingCount} مفقود
+                  </span>
+                )}
+                {reconciliationSummary.totalMissingCount === 0 && reconciliationSummary.totalCancelledOnMapCount > 0 && (
+                  <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">
+                    {reconciliationSummary.totalCancelledOnMapCount} ملغي
+                  </span>
+                )}
+                {reconciliationSummary.totalMissingCount === 0 && reconciliationSummary.totalCancelledOnMapCount === 0 && platformSegments.length > 0 && (
+                  <span className="text-emerald-500 dark:text-emerald-400 text-xs">✅</span>
+                )}
               </button>
             </div>
 
@@ -2131,6 +2319,434 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                 </div>
               </div>
             )}
+
+            {/* TAB CONTENT 5: Infrastructure Platform Reconciliation (مطابقة قطاعات البنية التحتية) */}
+            {activeAnalysisTab === 'reconciliation' && (
+              <div className="p-6 space-y-6 animate-in fade-in duration-300">
+                {/* Header & Action Buttons */}
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <Scale className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      <span>مطابقة قطاعات البنية التحتية والرقابة الذكية (Infrastructure Reconciliation)</span>
+                      <span className="text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full font-bold">
+                        PO: {activeProject?.po || 'غير محدد'}
+                      </span>
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      مطابقة حية بين معرفات القطاعات (Segment ID) المعتمدة في منصة البنية التحتية وما تم رسمه وإسقاطه على الخريطة التفاعلية.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsExcelImportModalOpen(true)}
+                      className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    >
+                      <UploadCloud className="h-4 w-4" />
+                      <span>استيراد وتحديث الإكسل 📥</span>
+                    </button>
+
+                    {reconciliationSummary.totalMissingCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rows = reconciliationSummary.missingSegments.map((seg, idx) => ({
+                            'م': idx + 1,
+                            'رقم القطاع (Segment ID)': seg.segmentMapId,
+                            'اسم المشروع': seg.projectName,
+                            'رقم أمر الشراء (PO)': seg.poNumber,
+                            'الشارع': seg.streets || '-',
+                            'الحي': seg.neighborhoods || '-',
+                            'المحافظة': seg.governorate || '-',
+                            'الطول المعتمد (متر)': seg.segmentLength,
+                            'حالة القطاع في المنصة': seg.segmentStatus,
+                            'كود التصريح / المشروع': seg.projectCode || '-',
+                            'الإجراء المطلوب': 'يجب رسمه وإسقاطه على الخريطة التفاعلية ⚠️'
+                          }));
+                          const ws = XLSX.utils.json_to_sheet(rows);
+                          const wb = XLSX.utils.book_new();
+                          XLSX.utils.book_append_sheet(wb, ws, "القطاعات المفقودة");
+                          XLSX.writeFile(wb, `القطاعات_المفقودة_${(activeProject?.name || 'مشروع').replace(/\s+/g, '_')}.xlsx`);
+                          showToast('📊 تم تصدير تقرير القطاعات المفقودة بنجاح!');
+                        }}
+                        className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                      >
+                        <FileDown className="h-4 w-4" />
+                        <span>تصدير النواقص إكسل ({reconciliationSummary.totalMissingCount}) ⚠️</span>
+                      </button>
+                    )}
+
+                    {reconciliationSummary.totalCancelledOnMapCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rows = reconciliationSummary.cancelledOnMapSegments.map((item, idx) => ({
+                            'م': idx + 1,
+                            'رقم القطاع (Segment ID)': item.platformSegment.segmentMapId,
+                            'اسم المشروع': item.platformSegment.projectName,
+                            'رقم أمر الشراء (PO)': item.platformSegment.poNumber,
+                            'الشارع': item.platformSegment.streets || '-',
+                            'الحي': item.platformSegment.neighborhoods || '-',
+                            'الطول بالمنصة (متر)': item.platformSegment.segmentLength,
+                            'الطول بالخريطة (متر)': item.matchedMapFeature?.lengthMeters || item.platformSegment.segmentLength,
+                            'حالة الإلغاء بالمنصة': item.platformSegment.segmentStatus,
+                            'اسم العنصر على الخريطة': item.matchedMapFeature?.name || '-',
+                            'الإجراء المطلوب': 'يجب حذفه وإزالته من الخريطة التفاعلية 🚫'
+                          }));
+                          const ws = XLSX.utils.json_to_sheet(rows);
+                          const wb = XLSX.utils.book_new();
+                          XLSX.utils.book_append_sheet(wb, ws, "القطاعات الملغاة");
+                          XLSX.writeFile(wb, `القطاعات_الملغاة_المطلوب_حذفها_${(activeProject?.name || 'مشروع').replace(/\s+/g, '_')}.xlsx`);
+                          showToast('🚫 تم تصدير تقرير القطاعات الملغاة بنجاح!');
+                        }}
+                        className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                      >
+                        <FileDown className="h-4 w-4" />
+                        <span>تصدير الملغاة للحذف ({reconciliationSummary.totalCancelledOnMapCount}) 🚫</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rows = platformSegments.map((seg, idx) => {
+                          const isCancelled = isSegmentStatusCancelled(seg.segmentStatus);
+                          const isMissing = reconciliationSummary.missingSegments.some(m => m.segmentMapId === seg.segmentMapId);
+                          const isCancelledOnMap = reconciliationSummary.cancelledOnMapSegments.some(c => c.platformSegment.segmentMapId === seg.segmentMapId);
+                          let statusText = 'مطابق ومسقط بالخريطة ✅';
+                          if (isCancelled && isCancelledOnMap) statusText = 'ملغي بالمنصة ويجب حذفه من الخريطة 🚫';
+                          else if (isCancelled && !isCancelledOnMap) statusText = 'ملغي بالمنصة وغير موجود بالخريطة (سليم) ✨';
+                          else if (isMissing) statusText = 'مفقود من الخريطة ويجب رسمه ⚠️';
+
+                          return {
+                            'م': idx + 1,
+                            'رقم القطاع (Segment ID)': seg.segmentMapId,
+                            'رقم أمر الشراء (PO)': seg.poNumber,
+                            'اسم المشروع': seg.projectName,
+                            'الشارع': seg.streets || '-',
+                            'الحي': seg.neighborhoods || '-',
+                            'المحافظة': seg.governorate || '-',
+                            'الطول المعتمد (متر)': seg.segmentLength,
+                            'حالة القطاع في المنصة': seg.segmentStatus,
+                            'حالة المطابقة مع الخريطة': statusText,
+                            'كود التصريح / المشروع': seg.projectCode || '-'
+                          };
+                        });
+                        const ws = XLSX.utils.json_to_sheet(rows);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "المطابقة الشاملة");
+                        XLSX.writeFile(wb, `تقرير_المطابقة_الشامل_${(activeProject?.name || 'مشروع').replace(/\s+/g, '_')}.xlsx`);
+                        showToast('📋 تم تصدير تقرير المطابقة الشامل بنجاح!');
+                      }}
+                      className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-slate-300 dark:border-slate-700"
+                    >
+                      <Download className="h-4 w-4 text-blue-500" />
+                      <span>تقرير المطابقة الشامل 📋</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4 Summary Metric Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                  {/* Card 1: Total Platform Segments */}
+                  <div className="p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-2xl border border-blue-200 dark:border-blue-900/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-blue-900 dark:text-blue-200">إجمالي قطاعات المنصة</span>
+                      <FileSpreadsheet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 dark:text-white font-mono">
+                      {reconciliationSummary.totalPlatformSegmentsCount} <span className="text-xs font-sans text-slate-500">قطاع</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                      الطول: {(reconciliationSummary.totalPlatformLengthMeters / 1000).toFixed(3)} كم ({reconciliationSummary.totalPlatformLengthMeters.toLocaleString('ar-SA')} م)
+                    </div>
+                  </div>
+
+                  {/* Card 2: Missing Segments to Add */}
+                  <div className={`p-4 rounded-2xl border space-y-2 ${
+                    reconciliationSummary.totalMissingCount > 0
+                      ? 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800 ring-2 ring-rose-500/20'
+                      : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-rose-900 dark:text-rose-200">قطاعات مفقودة من الخريطة</span>
+                      <AlertOctagon className="h-4 w-4 text-rose-600 dark:text-rose-400 animate-pulse" />
+                    </div>
+                    <div className="text-2xl font-black text-rose-700 dark:text-rose-300 font-mono">
+                      {reconciliationSummary.totalMissingCount} <span className="text-xs font-sans text-slate-500">قطاع</span>
+                    </div>
+                    <div className="text-[11px] text-rose-600 dark:text-rose-400 font-mono font-bold">
+                      الطول المفقود: {(reconciliationSummary.totalMissingLengthMeters / 1000).toFixed(3)} كم ({reconciliationSummary.totalMissingLengthMeters.toLocaleString('ar-SA')} م)
+                    </div>
+                  </div>
+
+                  {/* Card 3: Cancelled Segments on Map */}
+                  <div className={`p-4 rounded-2xl border space-y-2 ${
+                    reconciliationSummary.totalCancelledOnMapCount > 0
+                      ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 ring-2 ring-amber-500/20'
+                      : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-amber-900 dark:text-amber-200">ملغاة بالمنصة (يجب حذفها)</span>
+                      <Ban className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="text-2xl font-black text-amber-700 dark:text-amber-300 font-mono">
+                      {reconciliationSummary.totalCancelledOnMapCount} <span className="text-xs font-sans text-slate-500">قطاع</span>
+                    </div>
+                    <div className="text-[11px] text-amber-700 dark:text-amber-400 font-mono font-bold">
+                      الطول المرصود: {(reconciliationSummary.totalCancelledOnMapLengthMeters / 1000).toFixed(3)} كم ({reconciliationSummary.totalCancelledOnMapLengthMeters.toLocaleString('ar-SA')} م)
+                    </div>
+                  </div>
+
+                  {/* Card 4: Compliant Segments */}
+                  <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-emerald-900 dark:text-emerald-200">قطاعات مطابقة ومسقطة</span>
+                      <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <div className="text-2xl font-black text-emerald-700 dark:text-emerald-300 font-mono">
+                      {reconciliationSummary.totalCompliantCount} <span className="text-xs font-sans text-slate-500">قطاع</span>
+                    </div>
+                    <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-mono">
+                      الطول المطابق: {(reconciliationSummary.totalCompliantLengthMeters / 1000).toFixed(3)} كم ({reconciliationSummary.totalCompliantLengthMeters.toLocaleString('ar-SA')} م)
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter and Search Bar */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setReconciliationFilter('all')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        reconciliationFilter === 'all'
+                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      الكل ({platformSegments.length})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setReconciliationFilter('missing')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        reconciliationFilter === 'missing'
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                      }`}
+                    >
+                      قطاعات مفقودة ({reconciliationSummary.totalMissingCount}) ⚠️
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setReconciliationFilter('cancelled')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        reconciliationFilter === 'cancelled'
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                      }`}
+                    >
+                      ملغاة ويجب حذفها ({reconciliationSummary.totalCancelledOnMapCount}) 🚫
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setReconciliationFilter('compliant')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        reconciliationFilter === 'compliant'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                      }`}
+                    >
+                      مطابقة ({reconciliationSummary.totalCompliantCount}) ✅
+                    </button>
+                  </div>
+
+                  <div className="relative w-full sm:w-72">
+                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="بحث في القطاعات، الشوارع، الأحياء..."
+                      value={reconciliationSearch}
+                      onChange={e => setReconciliationSearch(e.target.value)}
+                      className="w-full text-xs py-2 pr-9 pl-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Table of Reconciliation Items */}
+                {platformSegments.length > 0 ? (
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+                    <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                      <table className="w-full text-right text-xs">
+                        <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold sticky top-0 border-b border-slate-200 dark:border-slate-700 z-10">
+                          <tr>
+                            <th className="p-3">م</th>
+                            <th className="p-3">معرف القطاع (Segment ID)</th>
+                            <th className="p-3">الموقع (الشارع / الحي)</th>
+                            <th className="p-3">الطول المعتمد (م)</th>
+                            <th className="p-3">حالة القطاع في المنصة</th>
+                            <th className="p-3">حالة المطابقة مع الخريطة</th>
+                            <th className="p-3">الإجراء الرقابي المطلوب</th>
+                            <th className="p-3">كود المشروع</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                          {platformSegments
+                            .filter(seg => {
+                              const isCancelled = isSegmentStatusCancelled(seg.segmentStatus);
+                              const isMissing = reconciliationSummary.missingSegments.some(m => m.segmentMapId === seg.segmentMapId);
+                              const isCancelledOnMap = reconciliationSummary.cancelledOnMapSegments.some(c => c.platformSegment.segmentMapId === seg.segmentMapId);
+                              const isCompliant = reconciliationSummary.compliantSegments.some(c => c.platformSegment.segmentMapId === seg.segmentMapId);
+
+                              if (reconciliationFilter === 'missing' && !isMissing) return false;
+                              if (reconciliationFilter === 'cancelled' && !isCancelledOnMap) return false;
+                              if (reconciliationFilter === 'compliant' && !isCompliant) return false;
+
+                              if (reconciliationSearch.trim()) {
+                                const q = reconciliationSearch.trim().toLowerCase();
+                                const matchId = seg.segmentMapId.toLowerCase().includes(q);
+                                const matchStreet = (seg.streets || '').toLowerCase().includes(q);
+                                const matchNeigh = (seg.neighborhoods || '').toLowerCase().includes(q);
+                                const matchCode = (seg.projectCode || '').toLowerCase().includes(q);
+                                return matchId || matchStreet || matchNeigh || matchCode;
+                              }
+                              return true;
+                            })
+                            .map((seg, idx) => {
+                              const isCancelled = isSegmentStatusCancelled(seg.segmentStatus);
+                              const isMissing = reconciliationSummary.missingSegments.some(m => m.segmentMapId === seg.segmentMapId);
+                              const isCancelledOnMap = reconciliationSummary.cancelledOnMapSegments.some(c => c.platformSegment.segmentMapId === seg.segmentMapId);
+                              const isCompliant = reconciliationSummary.compliantSegments.some(c => c.platformSegment.segmentMapId === seg.segmentMapId);
+
+                              return (
+                                <tr 
+                                  key={seg.id || idx}
+                                  className={`hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors ${
+                                    isMissing ? 'bg-rose-50/30 dark:bg-rose-950/10' :
+                                    isCancelledOnMap ? 'bg-amber-50/30 dark:bg-amber-950/10' : ''
+                                  }`}
+                                >
+                                  <td className="p-3 text-slate-400 font-mono">{idx + 1}</td>
+                                  
+                                  <td className="p-3">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-mono font-black text-slate-900 dark:text-slate-100 text-[11px]">
+                                        {seg.segmentMapId}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => copyToClipboard(seg.segmentMapId, 'معرف القطاع')}
+                                        className="p-1 text-slate-400 hover:text-blue-600 rounded transition-colors cursor-pointer"
+                                        title="نسخ رقم القطاع"
+                                      >
+                                        <Copy className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  </td>
+
+                                  <td className="p-3 text-[11px] text-slate-600 dark:text-slate-400 max-w-[200px] truncate" title={`${seg.streets} - ${seg.neighborhoods}`}>
+                                    <span className="font-semibold text-slate-800 dark:text-slate-200">{seg.streets || '-'}</span>
+                                    {seg.neighborhoods && <span className="block text-[10px] text-slate-400">{seg.neighborhoods}</span>}
+                                  </td>
+
+                                  <td className="p-3 font-mono font-bold text-slate-900 dark:text-slate-100">
+                                    {seg.segmentLength} م
+                                  </td>
+
+                                  <td className="p-3">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      isCancelled
+                                        ? 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                        : 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                                    }`}>
+                                      {seg.segmentStatus}
+                                    </span>
+                                  </td>
+
+                                  <td className="p-3 font-bold">
+                                    {isMissing && (
+                                      <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-bold">
+                                        <AlertOctagon className="h-3.5 w-3.5" />
+                                        <span>غير مسقط بالخريطة ❌</span>
+                                      </span>
+                                    )}
+                                    {isCancelledOnMap && (
+                                      <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold">
+                                        <Ban className="h-3.5 w-3.5" />
+                                        <span>مرسوم بالخريطة وهو ملغي ⚠️</span>
+                                      </span>
+                                    )}
+                                    {isCompliant && (
+                                      <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                        <span>مسقط ومطابق ✅</span>
+                                      </span>
+                                    )}
+                                    {!isMissing && !isCancelledOnMap && !isCompliant && isCancelled && (
+                                      <span className="inline-flex items-center gap-1 text-slate-400 font-normal">
+                                        <span>غير موجود بالخريطة (سليم) ✨</span>
+                                      </span>
+                                    )}
+                                  </td>
+
+                                  <td className="p-3">
+                                    {isMissing && (
+                                      <span className="px-2 py-1 rounded-lg bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-200 font-black text-[10px] border border-rose-300 dark:border-rose-800">
+                                        🔴 يلزم رسمه وإضافته
+                                      </span>
+                                    )}
+                                    {isCancelledOnMap && (
+                                      <span className="px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 font-black text-[10px] border border-amber-300 dark:border-amber-800">
+                                        🗑️ يلزم حذفه من الخريطة
+                                      </span>
+                                    )}
+                                    {isCompliant && (
+                                      <span className="px-2 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 font-bold text-[10px]">
+                                        ✨ مطابق ومكتمل
+                                      </span>
+                                    )}
+                                    {!isMissing && !isCancelledOnMap && !isCompliant && (
+                                      <span className="text-slate-400 text-[10px]">-</span>
+                                    )}
+                                  </td>
+
+                                  <td className="p-3 font-mono text-[10px] text-slate-500">
+                                    {seg.projectCode || '-'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-10 text-center bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl space-y-3">
+                    <FileSpreadsheet className="h-10 w-10 text-slate-400 mx-auto" />
+                    <h5 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                      لم يتم العثور على قطاعات مسجلة في قاعدة البيانات لهذا المشروع (PO: {activeProject?.po || 'غير محدد'})
+                    </h5>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                      يمكنك رفع وتحديث ملف الإكسل (Segment ID.xlsx) الخاص بمنصة البنية التحتية لتفعيل المطابقة التلقائية فوراً.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsExcelImportModalOpen(true)}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black rounded-xl shadow-md transition-all inline-flex items-center gap-2 cursor-pointer"
+                    >
+                      <UploadCloud className="h-4 w-4" />
+                      <span>رفع ملف Segment ID.xlsx الآن 📤</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2380,6 +2996,17 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
             setMapInputUrl(proj.mapUrl);
             loadAnalysis(proj.mapUrl, proj.name);
           }
+        }}
+      />
+
+      {/* Platform Segments Excel Import & Sync Modal */}
+      <PlatformSegmentsImportModal
+        isOpen={isExcelImportModalOpen}
+        onClose={() => setIsExcelImportModalOpen(false)}
+        onSuccess={() => {
+          setIsExcelImportModalOpen(false);
+          refreshPlatformSegments();
+          showToast('☁️ تم تحديث ومزامنة قطاعات البنية التحتية بنجاح!');
         }}
       />
     </div>

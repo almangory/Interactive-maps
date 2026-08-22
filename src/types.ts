@@ -272,4 +272,55 @@ export interface ProjectChangelogRecord {
   isViewed?: boolean;
 }
 
+export interface PlatformSegment {
+  id?: number;
+  poNumber: string;
+  projectName: string;
+  segmentMapId: string;
+  segmentLength: number;
+  neighborhoods?: string;
+  governorate?: string;
+  streets?: string;
+  segmentStatus: string; // منسق, نشط, مغلق اولياً, ملغي, بانتظار الموافقة على الإلغاء
+  projectCode?: string;
+  contractor?: string;
+  asset?: string;
+  work?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SegmentReconciliationSummary {
+  poNumber: string;
+  projectName: string;
+  totalPlatformSegmentsCount: number;
+  totalPlatformLengthMeters: number;
+  
+  // 1. Missing Segments: Active in platform (NOT cancelled), but NOT drawn on map
+  missingSegments: PlatformSegment[];
+  totalMissingCount: number;
+  totalMissingLengthMeters: number;
+  
+  // 2. Cancelled on Map Segments: Cancelled in platform (ملغي / بانتظار الموافقة على الإلغاء), but STILL drawn on map
+  cancelledOnMapSegments: {
+    platformSegment: PlatformSegment;
+    matchedMapFeature?: KMLFeatureItem;
+  }[];
+  totalCancelledOnMapCount: number;
+  totalCancelledOnMapLengthMeters: number;
+
+  // 3. Compliant Segments: Active in platform AND drawn on map
+  compliantSegments: {
+    platformSegment: PlatformSegment;
+    matchedMapFeature: KMLFeatureItem;
+  }[];
+  totalCompliantCount: number;
+  totalCompliantLengthMeters: number;
+
+  // 4. Unregistered / Extra Segments on Map: Drawn on map with segment IDs not found in platform Excel
+  unregisteredMapSegments: KMLFeatureItem[];
+  totalUnregisteredCount: number;
+}
+
+
 
