@@ -8,12 +8,12 @@ import { extractSegmentIdFromData, extractPermitNoFromText, processGeometricalSe
 import length from '@turf/length';
 import { lineString } from '@turf/helpers';
 
-// Color mappings requested
+// Concise color and status category mappings
 export const COLOR_CONFIG: Record<StatusCategory, { hex: string; label: string; labelEn: string }> = {
-  executed_water: { hex: '#01579B', label: 'منفذ - شبكات مياه', labelEn: 'Executed - Water Networks' },
-  executed_sewage: { hex: '#097138', label: 'منفذ - شبكات صرف صحي', labelEn: 'Executed - Sewage Networks' },
-  ongoing: { hex: '#ffea00', label: 'جاري العمل / التنفيذ', labelEn: 'Ongoing / In Progress' },
-  remaining: { hex: '#a52714', label: 'أعمال متبقية', labelEn: 'Remaining Works' },
+  executed_water: { hex: '#01579B', label: 'منفذ مياه', labelEn: 'Executed Water' },
+  executed_sewage: { hex: '#097138', label: 'منفذ صرف', labelEn: 'Executed Sewage' },
+  ongoing: { hex: '#ffea00', label: 'جاري التنفيذ', labelEn: 'In Progress' },
+  remaining: { hex: '#a52714', label: 'خطوط متبقية', labelEn: 'Remaining Lines' },
   cancelled: { hex: '#F48FB1', label: 'خطوط تم إلغائها / ملغى', labelEn: 'Cancelled Lines' }
 };
 

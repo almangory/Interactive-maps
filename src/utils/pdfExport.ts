@@ -211,7 +211,7 @@ export async function exportAnalysisToPDF(result: KMLAnalysisResult, projectName
     ctx1.fillStyle = '#0f172a';
     ctx1.font = 'bold 20px system-ui, sans-serif';
     ctx1.textAlign = 'right';
-    ctx1.fillText('2. جدول إحصائيات الأطوال والتصاريح حسب كود اللون', width - 40, tableY);
+    ctx1.fillText('2. جدول إحصائيات الأطوال والتصاريح حسب حالة التنفيذ', width - 40, tableY);
 
     const thY = tableY + 20;
     ctx1.fillStyle = '#0f172a';
@@ -220,11 +220,10 @@ export async function exportAnalysisToPDF(result: KMLAnalysisResult, projectName
     ctx1.fillStyle = '#ffffff';
     ctx1.font = 'bold 14px system-ui, sans-serif';
     ctx1.fillText('التصنيف وحالة التنفيذ', width - 60, thY + 28);
-    ctx1.fillText('كود اللون', width - 290, thY + 28);
-    ctx1.fillText('النسبة المئوية', width - 460, thY + 28);
-    ctx1.fillText('الطول (كيلومتر)', width - 620, thY + 28);
-    ctx1.fillText('الطول (متر)', width - 800, thY + 28);
-    ctx1.fillText('عدد الخطوط', width - 960, thY + 28);
+    ctx1.fillText('النسبة المئوية', width - 360, thY + 28);
+    ctx1.fillText('الطول (كيلومتر)', width - 540, thY + 28);
+    ctx1.fillText('الطول (متر)', width - 740, thY + 28);
+    ctx1.fillText('عدد الخطوط', width - 930, thY + 28);
     ctx1.fillText('عدد التصاريح', width - 1100, thY + 28);
 
     let trY = thY + 42;
@@ -248,20 +247,16 @@ export async function exportAnalysisToPDF(result: KMLAnalysisResult, projectName
       ctx1.font = 'bold 13px system-ui, sans-serif';
       ctx1.fillText(getStatusCategoryLabel(cat, titleName, result.projectScope), width - 80, trY + 24);
 
-      ctx1.font = '13px font-mono, sans-serif';
-      ctx1.fillStyle = '#475569';
-      ctx1.fillText(cfg.hex, width - 290, trY + 24);
-
       ctx1.fillStyle = '#0f172a';
       ctx1.font = 'bold 13px font-mono, sans-serif';
-      ctx1.fillText(`%${stats?.percentage || 0}`, width - 460, trY + 24);
+      ctx1.fillText(`%${stats?.percentage || 0}`, width - 360, trY + 24);
 
       ctx1.fillStyle = '#0284c7';
-      ctx1.fillText(`${stats?.totalLengthKm || 0} كم`, width - 620, trY + 24);
+      ctx1.fillText(`${stats?.totalLengthKm || 0} كم`, width - 540, trY + 24);
 
       ctx1.fillStyle = '#0f172a';
-      ctx1.fillText(`${(stats?.totalLengthMeters || 0).toLocaleString()} م`, width - 800, trY + 24);
-      ctx1.fillText(`${stats?.segmentCount || 0}`, width - 960, trY + 24);
+      ctx1.fillText(`${(stats?.totalLengthMeters || 0).toLocaleString()} م`, width - 740, trY + 24);
+      ctx1.fillText(`${stats?.segmentCount || 0}`, width - 930, trY + 24);
       ctx1.fillText(`${stats?.permitCount || 0}`, width - 1100, trY + 24);
 
       trY += 38;

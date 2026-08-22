@@ -229,8 +229,9 @@ export const MapLegend: React.FC<MapLegendProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <div className="text-[10px] text-slate-400 font-mono font-bold pt-1">
-                        {t('legend.colorCode', 'كود اللون:')} {cfg.hex}
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium pt-0.5 flex items-center justify-between">
+                        <span>{t('legend.pending', 'بانتظار التحليل')}</span>
+                        <span className="font-mono text-[9px] text-slate-300 dark:text-slate-600">---</span>
                       </div>
                     )}
                   </div>

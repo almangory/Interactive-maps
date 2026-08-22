@@ -278,10 +278,10 @@ export function RedNoSegmentModal({
               <Layers className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">الكود اللوني المعتمد</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">حالة الأعمال المستهدفة</div>
               <div className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5 flex items-center gap-1.5">
                 <span className="w-3.5 h-3.5 rounded-full bg-[#a52714] inline-block border border-slate-300"></span>
-                #A52714 (أعمال متبقية)
+                <span>خطوط متبقية (غير مرقمة)</span>
               </div>
             </div>
           </div>

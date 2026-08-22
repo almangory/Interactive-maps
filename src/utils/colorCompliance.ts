@@ -17,19 +17,19 @@ export interface ApprovedColorSpec {
 }
 
 export const APPROVED_NWC_COLORS: ApprovedColorSpec[] = [
-  { key: 'executed_water', nameAr: 'منفذ - مياه', nameEn: 'Executed - Water', color: '#01579B' },
-  { key: 'executed_sewer', nameAr: 'منفذ - صرف', nameEn: 'Executed - Sewer', color: '#097138' },
-  { key: 'in_progress', nameAr: 'جاري العمل', nameEn: 'Work in Progress', color: '#FFEA00' },
-  { key: 'remaining', nameAr: 'أعمال متبقية', nameEn: 'Remaining Work', color: '#A52714' },
-  { key: 'cancelled', nameAr: 'أعمال تم الغائها', nameEn: 'Cancelled Works', color: '#F48FB1' },
+  { key: 'executed_water', nameAr: 'منفذ مياه', nameEn: 'Executed Water', color: '#01579B' },
+  { key: 'executed_sewer', nameAr: 'منفذ صرف', nameEn: 'Executed Sewer', color: '#097138' },
+  { key: 'in_progress', nameAr: 'جاري التنفيذ', nameEn: 'In Progress', color: '#FFEA00' },
+  { key: 'remaining', nameAr: 'خطوط متبقية', nameEn: 'Remaining Lines', color: '#A52714' },
+  { key: 'cancelled', nameAr: 'خطوط تم إلغاؤها / ملغى', nameEn: 'Cancelled Lines', color: '#F48FB1' },
 ];
 
 export const EXACT_APPROVED_COLOR_MAP: Record<string, ApprovedColorSpec> = {
-  '#01579B': { key: 'executed_water', nameAr: 'منفذ - مياه', nameEn: 'Executed - Water', color: '#01579B' },
-  '#097138': { key: 'executed_sewer', nameAr: 'منفذ - صرف', nameEn: 'Executed - Sewer', color: '#097138' },
-  '#FFEA00': { key: 'in_progress', nameAr: 'جاري العمل', nameEn: 'Work in Progress', color: '#FFEA00' },
-  '#A52714': { key: 'remaining', nameAr: 'أعمال متبقية', nameEn: 'Remaining Work', color: '#A52714' },
-  '#F48FB1': { key: 'cancelled', nameAr: 'أعمال تم الغائها', nameEn: 'Cancelled Works', color: '#F48FB1' },
+  '#01579B': { key: 'executed_water', nameAr: 'منفذ مياه', nameEn: 'Executed Water', color: '#01579B' },
+  '#097138': { key: 'executed_sewer', nameAr: 'منفذ صرف', nameEn: 'Executed Sewer', color: '#097138' },
+  '#FFEA00': { key: 'in_progress', nameAr: 'جاري التنفيذ', nameEn: 'In Progress', color: '#FFEA00' },
+  '#A52714': { key: 'remaining', nameAr: 'خطوط متبقية', nameEn: 'Remaining Lines', color: '#A52714' },
+  '#F48FB1': { key: 'cancelled', nameAr: 'خطوط تم إلغاؤها / ملغى', nameEn: 'Cancelled Lines', color: '#F48FB1' },
 };
 
 export const normalizeHexToRgbHex = (hex: string): string => {
