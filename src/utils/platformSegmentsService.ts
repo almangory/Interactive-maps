@@ -191,35 +191,71 @@ export async function savePlatformSegmentsBulk(segments: PlatformSegment[]): Pro
     let savedCount = 0;
     const batchSize = 40;
 
+    const escapeStr = (val?: string) => {
+      if (!val) return "''";
+      return `'${String(val).replace(/'/g, "''")}'`;
+    };
+
     for (let i = 0; i < segments.length; i += batchSize) {
       const batch = segments.slice(i, i + batchSize);
       
-      for (const seg of batch) {
-        await neonSql`
-          INSERT INTO platform_segments (
-            po_number, project_name, segment_map_id, segment_length,
-            neighborhoods, governorate, streets, segment_status,
-            project_code, contractor, asset, work
-          )
-          VALUES (
-            ${seg.poNumber || ''}, ${seg.projectName || ''}, ${seg.segmentMapId}, ${seg.segmentLength || 0},
-            ${seg.neighborhoods || ''}, ${seg.governorate || ''}, ${seg.streets || ''}, ${seg.segmentStatus || 'منسق'},
-            ${seg.projectCode || ''}, ${seg.contractor || ''}, ${seg.asset || ''}, ${seg.work || ''}
-          )
-          ON CONFLICT (po_number, segment_map_id) DO UPDATE SET
-            project_name = EXCLUDED.project_name,
-            segment_length = EXCLUDED.segment_length,
-            neighborhoods = EXCLUDED.neighborhoods,
-            governorate = EXCLUDED.governorate,
-            streets = EXCLUDED.streets,
-            segment_status = EXCLUDED.segment_status,
-            project_code = EXCLUDED.project_code,
-            contractor = EXCLUDED.contractor,
-            asset = EXCLUDED.asset,
-            work = EXCLUDED.work,
-            updated_at = NOW();
-        `;
-        savedCount++;
+      const valueRows = batch.map(seg => {
+        return `(${escapeStr(seg.poNumber)}, ${escapeStr(seg.projectName)}, ${escapeStr(seg.segmentMapId)}, ${Number(seg.segmentLength) || 0}, ${escapeStr(seg.neighborhoods)}, ${escapeStr(seg.governorate)}, ${escapeStr(seg.streets)}, ${escapeStr(seg.segmentStatus || 'منسق')}, ${escapeStr(seg.projectCode)}, ${escapeStr(seg.contractor)}, ${escapeStr(seg.asset)}, ${escapeStr(seg.work)})`;
+      });
+
+      const rawSql = `
+        INSERT INTO platform_segments (
+          po_number, project_name, segment_map_id, segment_length,
+          neighborhoods, governorate, streets, segment_status,
+          project_code, contractor, asset, work
+        )
+        VALUES ${valueRows.join(', ')}
+        ON CONFLICT (po_number, segment_map_id) DO UPDATE SET
+          project_name = EXCLUDED.project_name,
+          segment_length = EXCLUDED.segment_length,
+          neighborhoods = EXCLUDED.neighborhoods,
+          governorate = EXCLUDED.governorate,
+          streets = EXCLUDED.streets,
+          segment_status = EXCLUDED.segment_status,
+          project_code = EXCLUDED.project_code,
+          contractor = EXCLUDED.contractor,
+          asset = EXCLUDED.asset,
+          work = EXCLUDED.work,
+          updated_at = NOW();
+      `;
+
+      try {
+        await (neonSql as any)(rawSql);
+        savedCount += batch.length;
+      } catch (batchErr) {
+        console.warn('Batch insert error, falling back to sequential for this batch:', batchErr);
+        for (const seg of batch) {
+          await neonSql`
+            INSERT INTO platform_segments (
+              po_number, project_name, segment_map_id, segment_length,
+              neighborhoods, governorate, streets, segment_status,
+              project_code, contractor, asset, work
+            )
+            VALUES (
+              ${seg.poNumber || ''}, ${seg.projectName || ''}, ${seg.segmentMapId}, ${seg.segmentLength || 0},
+              ${seg.neighborhoods || ''}, ${seg.governorate || ''}, ${seg.streets || ''}, ${seg.segmentStatus || 'منسق'},
+              ${seg.projectCode || ''}, ${seg.contractor || ''}, ${seg.asset || ''}, ${seg.work || ''}
+            )
+            ON CONFLICT (po_number, segment_map_id) DO UPDATE SET
+              project_name = EXCLUDED.project_name,
+              segment_length = EXCLUDED.segment_length,
+              neighborhoods = EXCLUDED.neighborhoods,
+              governorate = EXCLUDED.governorate,
+              streets = EXCLUDED.streets,
+              segment_status = EXCLUDED.segment_status,
+              project_code = EXCLUDED.project_code,
+              contractor = EXCLUDED.contractor,
+              asset = EXCLUDED.asset,
+              work = EXCLUDED.work,
+              updated_at = NOW();
+          `;
+          savedCount++;
+        }
       }
     }
 
@@ -324,110 +360,120 @@ export function reconcileProjectSegments(
 
 /**
  * Parse an Excel File (ArrayBuffer / binary) to extract PlatformSegment array
+ * Iterates through all sheets in the workbook and aggregates/deduplicates all segments.
  */
 export function parsePlatformSegmentsFromExcel(dataBuffer: ArrayBuffer): PlatformSegment[] {
   const workbook = XLSX.read(dataBuffer, { type: 'array' });
-  const firstSheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[firstSheetName];
-  const rawRows: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+  const dedupedMap = new Map<string, PlatformSegment>();
 
-  if (rawRows.length < 2) return [];
+  for (const sheetName of workbook.SheetNames) {
+    const worksheet = workbook.Sheets[sheetName];
+    if (!worksheet) continue;
 
-  // Parse header row to find column indexes dynamically
-  const headerRow = (rawRows[0] || []).map((h: any) => String(h || '').trim().toLowerCase());
-  
-  const findCol = (candidates: string[]): number => {
-    for (const c of candidates) {
-      const idx = headerRow.findIndex((h: string) => h.includes(c.toLowerCase()));
-      if (idx !== -1) return idx;
+    const rawRows: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+    if (rawRows.length < 2) continue;
+
+    // Parse header row to find column indexes dynamically
+    const headerRow = (rawRows[0] || []).map((h: any) => String(h || '').trim().toLowerCase());
+    
+    const findCol = (candidates: string[]): number => {
+      for (const c of candidates) {
+        const idx = headerRow.findIndex((h: string) => h.includes(c.toLowerCase()));
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    };
+
+    const colSegmentId = findCol(['segment_map_id', 'segment id', 'معرف القطاع', 'رقم القطاع', 'segment_id']) !== -1 
+      ? findCol(['segment_map_id', 'segment id', 'معرف القطاع', 'رقم القطاع', 'segment_id']) 
+      : 0;
+
+    const colLength = findCol(['segment_length', 'طول القطاع', 'length', 'الطول']) !== -1
+      ? findCol(['segment_length', 'طول القطاع', 'length', 'الطول'])
+      : 1;
+
+    const colNeighborhood = findCol(['neighborhoods', 'neighborhood', 'الحي', 'الأحياء', 'احياء']) !== -1
+      ? findCol(['neighborhoods', 'neighborhood', 'الحي', 'الأحياء', 'احياء'])
+      : (rawRows[0] && rawRows[0].length > 5 ? 5 : -1);
+
+    const colGov = findCol(['governorate', 'المحافظة', 'محافظة']) !== -1
+      ? findCol(['governorate', 'المحافظة', 'محافظة'])
+      : (rawRows[0] && rawRows[0].length > 6 ? 6 : -1);
+
+    const colStreets = findCol(['streets', 'street', 'الشارع', 'الشوارع']) !== -1
+      ? findCol(['streets', 'street', 'الشارع', 'الشوارع'])
+      : (rawRows[0] && rawRows[0].length > 7 ? 7 : -1);
+
+    const colStatus = findCol(['segment_status', 'حالة القطاع', 'حالة']) !== -1
+      ? findCol(['segment_status', 'حالة القطاع', 'حالة'])
+      : (rawRows[0] && rawRows[0].length > 8 ? 8 : -1);
+
+    const colProjCode = findCol(['project_code', 'كود المشروع', 'رقم التصريح', 'تصريح']) !== -1
+      ? findCol(['project_code', 'كود المشروع', 'رقم التصريح', 'تصريح'])
+      : (rawRows[0] && rawRows[0].length > 9 ? 9 : -1);
+
+    const colPo = findCol(['رقم أمر الشراء', 'أمر الشراء', 'po', 'po_number', 'رقم po']) !== -1
+      ? findCol(['رقم أمر الشراء', 'أمر الشراء', 'po', 'po_number', 'رقم po'])
+      : (rawRows[0] && rawRows[0].length > 19 ? 19 : -1);
+
+    const colProjectName = findCol(['أسم المشروع الصحيح', 'اسم المشروع الصحيح', 'project_name', 'اسم المشروع']) !== -1
+      ? findCol(['أسم المشروع الصحيح', 'اسم المشروع الصحيح', 'project_name', 'اسم المشروع'])
+      : (findCol(['project_name']) !== -1 ? findCol(['project_name']) : (rawRows[0] && rawRows[0].length > 20 ? 20 : 11));
+
+    const colContractor = findCol(['المقاول', 'contractor', 'contractors', 'الشركة المنفذة']) !== -1
+      ? findCol(['المقاول', 'contractor', 'contractors', 'الشركة المنفذة'])
+      : (rawRows[0] && rawRows[0].length > 21 ? 21 : 17);
+
+    const colAsset = findCol(['asset', 'النوع', 'نوع الأصل', 'مياه / صرف']) !== -1
+      ? findCol(['asset', 'النوع', 'نوع الأصل', 'مياه / صرف'])
+      : (rawRows[0] && rawRows[0].length > 12 ? 12 : -1);
+
+    const colWork = findCol(['work', 'نوع العمل', 'الأعمال']) !== -1
+      ? findCol(['work', 'نوع العمل', 'الأعمال'])
+      : (rawRows[0] && rawRows[0].length > 13 ? 13 : -1);
+
+    for (let r = 1; r < rawRows.length; r++) {
+      const row = rawRows[r];
+      if (!row || row.length === 0) continue;
+
+      const segId = String(row[colSegmentId] || '').trim();
+      if (!segId || segId.toLowerCase() === 'segment_map_id') continue;
+
+      const lenVal = parseFloat(String(row[colLength] || '0').replace(/,/g, '')) || 0;
+      const poVal = colPo !== -1 ? String(row[colPo] || '').trim() : '';
+      const projNameVal = colProjectName !== -1 ? String(row[colProjectName] || '').trim() : '';
+      const contractorVal = colContractor !== -1 ? String(row[colContractor] || '').trim() : '';
+      const neighborhoodVal = colNeighborhood !== -1 ? String(row[colNeighborhood] || '').trim() : '';
+      const govVal = colGov !== -1 ? String(row[colGov] || '').trim() : '';
+      const streetsVal = colStreets !== -1 ? String(row[colStreets] || '').trim() : '';
+      const statusVal = colStatus !== -1 ? String(row[colStatus] || 'منسق').trim() : 'منسق';
+      const codeVal = colProjCode !== -1 ? String(row[colProjCode] || '').trim() : '';
+      const assetVal = colAsset !== -1 ? String(row[colAsset] || '').trim() : '';
+      const workVal = colWork !== -1 ? String(row[colWork] || '').trim() : '';
+
+      const key = `${poVal}_${segId}`;
+      const existing = dedupedMap.get(key);
+
+      const segmentObj: PlatformSegment = {
+        segmentMapId: segId,
+        segmentLength: lenVal,
+        poNumber: poVal,
+        projectName: projNameVal || existing?.projectName || '',
+        contractor: contractorVal || existing?.contractor || '',
+        neighborhoods: neighborhoodVal || existing?.neighborhoods || '',
+        governorate: govVal || existing?.governorate || '',
+        streets: streetsVal || existing?.streets || '',
+        segmentStatus: statusVal,
+        projectCode: codeVal || existing?.projectCode || '',
+        asset: assetVal || existing?.asset || '',
+        work: workVal || existing?.work || ''
+      };
+
+      if (!existing || (contractorVal && !existing.contractor)) {
+        dedupedMap.set(key, segmentObj);
+      }
     }
-    return -1;
-  };
-
-  const colSegmentId = findCol(['segment_map_id', 'segment id', 'معرف القطاع', 'رقم القطاع', 'segment_id']) !== -1 
-    ? findCol(['segment_map_id', 'segment id', 'معرف القطاع', 'رقم القطاع', 'segment_id']) 
-    : 0;
-
-  const colLength = findCol(['segment_length', 'طول القطاع', 'length', 'الطول']) !== -1
-    ? findCol(['segment_length', 'طول القطاع', 'length', 'الطول'])
-    : 1;
-
-  const colNeighborhood = findCol(['neighborhoods', 'neighborhood', 'الحي', 'الأحياء', 'احياء']) !== -1
-    ? findCol(['neighborhoods', 'neighborhood', 'الحي', 'الأحياء', 'احياء'])
-    : 4;
-
-  const colGov = findCol(['governorate', 'المحافظة', 'محافظة']) !== -1
-    ? findCol(['governorate', 'المحافظة', 'محافظة'])
-    : 5;
-
-  const colStreets = findCol(['streets', 'street', 'الشارع', 'الشوارع']) !== -1
-    ? findCol(['streets', 'street', 'الشارع', 'الشوارع'])
-    : 6;
-
-  const colStatus = findCol(['segment_status', 'حالة القطاع', 'حالة']) !== -1
-    ? findCol(['segment_status', 'حالة القطاع', 'حالة'])
-    : 7;
-
-  const colProjCode = findCol(['project_code', 'كود المشروع', 'رقم التصريح', 'تصريح']) !== -1
-    ? findCol(['project_code', 'كود المشروع', 'رقم التصريح', 'تصريح'])
-    : 8;
-
-  const colPo = findCol(['رقم أمر الشراء', 'أمر الشراء', 'po', 'po_number', 'رقم po']) !== -1
-    ? findCol(['رقم أمر الشراء', 'أمر الشراء', 'po', 'po_number', 'رقم po'])
-    : 18;
-
-  const colProjectName = findCol(['أسم المشروع الصحيح', 'اسم المشروع الصحيح', 'project_name', 'اسم المشروع']) !== -1
-    ? findCol(['أسم المشروع الصحيح', 'اسم المشروع الصحيح', 'project_name', 'اسم المشروع'])
-    : (findCol(['project_name']) !== -1 ? findCol(['project_name']) : 19);
-
-  const colContractor = findCol(['المقاول', 'contractor', 'contractors', 'الشركة المنفذة']) !== -1
-    ? findCol(['المقاول', 'contractor', 'contractors', 'الشركة المنفذة'])
-    : 20;
-
-  const colAsset = findCol(['asset', 'النوع', 'نوع الأصل', 'مياه / صرف']) !== -1
-    ? findCol(['asset', 'النوع', 'نوع الأصل', 'مياه / صرف'])
-    : 11;
-
-  const colWork = findCol(['work', 'نوع العمل', 'الأعمال']) !== -1
-    ? findCol(['work', 'نوع العمل', 'الأعمال'])
-    : 12;
-
-  const parsedSegments: PlatformSegment[] = [];
-
-  for (let r = 1; r < rawRows.length; r++) {
-    const row = rawRows[r];
-    if (!row || row.length === 0) continue;
-
-    const segId = String(row[colSegmentId] || '').trim();
-    if (!segId) continue;
-
-    const lenVal = parseFloat(String(row[colLength] || '0').replace(/,/g, '')) || 0;
-    const poVal = String(row[colPo] || '').trim();
-    const projNameVal = String(row[colProjectName] || '').trim() || String(row[10] || '').trim();
-    const contractorVal = String(row[colContractor] || '').trim() || String(row[16] || '').trim();
-    const neighborhoodVal = String(row[colNeighborhood] || '').trim();
-    const govVal = String(row[colGov] || '').trim();
-    const streetsVal = String(row[colStreets] || '').trim();
-    const statusVal = String(row[colStatus] || 'منسق').trim();
-    const codeVal = String(row[colProjCode] || '').trim();
-    const assetVal = String(row[colAsset] || '').trim();
-    const workVal = String(row[colWork] || '').trim();
-
-    parsedSegments.push({
-      segmentMapId: segId,
-      segmentLength: lenVal,
-      poNumber: poVal,
-      projectName: projNameVal,
-      contractor: contractorVal,
-      neighborhoods: neighborhoodVal,
-      governorate: govVal,
-      streets: streetsVal,
-      segmentStatus: statusVal,
-      projectCode: codeVal,
-      asset: assetVal,
-      work: workVal
-    });
   }
 
-  return parsedSegments;
+  return Array.from(dedupedMap.values());
 }
