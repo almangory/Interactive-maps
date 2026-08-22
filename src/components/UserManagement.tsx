@@ -201,6 +201,9 @@ export function UserManagement({
   // Sub-program selection state for permissions
   const [selectedSubProgramForPerms, setSelectedSubProgramForPerms] = useState<string>('');
 
+  // Search by project name for permissions assignment
+  const [projectSearchTermForPerms, setProjectSearchTermForPerms] = useState<string>('');
+
   const isAdmin = currentUser.role === 'admin';
 
   // Helper to test if a project matches the base permissions (regions, scopes, statuses)
@@ -269,7 +272,7 @@ export function UserManagement({
     }
   }, [subPrograms, selectedSubProgramForPerms]);
 
-  // Compute projects in the selected sub-program and filtered by status
+  // Compute projects in the selected sub-program and filtered by status & search term
   const projectsInSelectedSubProgram = useMemo(() => {
     let list = eligibleBaseProjects;
     if (selectedSubProgramForPerms && selectedSubProgramForPerms !== 'all' && selectedSubProgramForPerms !== 'الكل') {
@@ -278,8 +281,18 @@ export function UserManagement({
     if (selectedStatusForPerms && selectedStatusForPerms !== 'all' && selectedStatusForPerms !== 'الكل') {
       list = list.filter(p => (p.status || '').trim() === selectedStatusForPerms.trim());
     }
+    if (projectSearchTermForPerms.trim()) {
+      const term = projectSearchTermForPerms.trim().toLowerCase();
+      list = list.filter(p => 
+        (p.name || '').toLowerCase().includes(term) ||
+        (p.operationalNumber || '').toLowerCase().includes(term) ||
+        (p.contractor || '').toLowerCase().includes(term) ||
+        (p.classification || '').toLowerCase().includes(term) ||
+        (p.region || '').toLowerCase().includes(term)
+      );
+    }
     return list;
-  }, [eligibleBaseProjects, selectedSubProgramForPerms, selectedStatusForPerms]);
+  }, [eligibleBaseProjects, selectedSubProgramForPerms, selectedStatusForPerms, projectSearchTermForPerms]);
 
   const handleSelectUser = (user: User) => {
     setSelectedUser(user);
@@ -1373,42 +1386,82 @@ export function UserManagement({
                 </div>
               </div>
 
-              {/* Sub-Program & Status Filter dropdown selection */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white dark:bg-slate-900 p-3 rounded-xl border border-amber-200/50 dark:border-amber-900/40">
-                {/* 1. Sub-Program Filter */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-between">
-                    <span>{language === 'en' ? '1. Active Sub-Program:' : '1. البرنامج الفرعي:'}</span>
-                    <span className="text-[10px] font-normal text-slate-400">({subPrograms.length} برنامج)</span>
-                  </label>
-                  <select
-                    value={selectedSubProgramForPerms}
-                    onChange={e => setSelectedSubProgramForPerms(e.target.value)}
-                    className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-800 dark:text-slate-200"
-                  >
-                    <option value="all">{language === 'en' ? '-- All Sub-Programs (All) --' : '-- جميع البرامج الفرعية (الكل) --'}</option>
-                    {subPrograms.map(sp => (
-                      <option key={sp} value={sp}>{translateDynamic(sp)}</option>
-                    ))}
-                  </select>
+              {/* Sub-Program, Status & Name Search Filter dropdown selection */}
+              <div className="space-y-2.5 bg-white dark:bg-slate-900 p-3 rounded-xl border border-amber-200/50 dark:border-amber-900/40">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* 1. Sub-Program Filter */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-between">
+                      <span>{language === 'en' ? '1. Active Sub-Program:' : '1. البرنامج الفرعي:'}</span>
+                      <span className="text-[10px] font-normal text-slate-400">({subPrograms.length} برنامج)</span>
+                    </label>
+                    <select
+                      value={selectedSubProgramForPerms}
+                      onChange={e => setSelectedSubProgramForPerms(e.target.value)}
+                      className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-800 dark:text-slate-200"
+                    >
+                      <option value="all">{language === 'en' ? '-- All Sub-Programs (All) --' : '-- جميع البرامج الفرعية (الكل) --'}</option>
+                      {subPrograms.map(sp => (
+                        <option key={sp} value={sp}>{translateDynamic(sp)}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 2. Status Filter Dropdown */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-between">
+                      <span>{language === 'en' ? '2. Filter by Project Status:' : '2. فلترة المشاريع حسب الحالة:'}</span>
+                      <span className="text-[10px] font-normal text-slate-400">({ALL_PROJECT_STATUSES.length} حالة)</span>
+                    </label>
+                    <select
+                      value={selectedStatusForPerms}
+                      onChange={e => setSelectedStatusForPerms(e.target.value)}
+                      className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-800 dark:text-slate-200"
+                    >
+                      <option value="all">{language === 'en' ? '-- All Statuses (Show All) --' : '-- جميع حالات المشاريع (عرض الكل) --'}</option>
+                      {ALL_PROJECT_STATUSES.map(st => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                {/* 2. Status Filter Dropdown (as requested) */}
-                <div className="space-y-1">
+                {/* 3. Search by Project Name / PO / Contractor */}
+                <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-between">
-                    <span>{language === 'en' ? '2. Filter by Project Status:' : '2. فلترة المشاريع حسب الحالة:'}</span>
-                    <span className="text-[10px] font-normal text-slate-400">({ALL_PROJECT_STATUSES.length} حالة)</span>
+                    <span className="flex items-center gap-1">
+                      <Search className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      <span>{language === 'en' ? '3. Search Project Name / PO / Contractor:' : '3. بحث باسم المشروع / الرقم التشغيلي / المقاول:'}</span>
+                    </span>
+                    {projectSearchTermForPerms && (
+                      <button
+                        type="button"
+                        onClick={() => setProjectSearchTermForPerms('')}
+                        className="text-[10px] font-bold text-rose-500 hover:underline cursor-pointer"
+                      >
+                        {language === 'en' ? 'Clear Search ✕' : 'مسح البحث ✕'}
+                      </button>
+                    )}
                   </label>
-                  <select
-                    value={selectedStatusForPerms}
-                    onChange={e => setSelectedStatusForPerms(e.target.value)}
-                    className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-800 dark:text-slate-200"
-                  >
-                    <option value="all">{language === 'en' ? '-- All Statuses (Show All) --' : '-- جميع حالات المشاريع (عرض الكل) --'}</option>
-                    {ALL_PROJECT_STATUSES.map(st => (
-                      <option key={st} value={st}>{st}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <Search className={`absolute ${isRtl ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none`} />
+                    <input
+                      type="text"
+                      placeholder={language === 'en' ? 'Search by project name, PO number, or contractor...' : 'اكتب اسم المشروع، الرقم التشغيلي، أو المقاول للبحث والفلترة...'}
+                      value={projectSearchTermForPerms}
+                      onChange={e => setProjectSearchTermForPerms(e.target.value)}
+                      className={`w-full text-xs ${isRtl ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 focus:bg-white dark:focus:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder-slate-400 shadow-2xs`}
+                    />
+                    {projectSearchTermForPerms && (
+                      <button
+                        type="button"
+                        onClick={() => setProjectSearchTermForPerms('')}
+                        className={`absolute ${isRtl ? 'left-2.5' : 'right-2.5'} top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-0.5`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
