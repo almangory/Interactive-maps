@@ -28,6 +28,7 @@ import {
   NotificationSettings 
 } from './components/NotificationSettingsPage';
 import { PWAInstallPrompt, PWAInstallHeaderButton } from './components/PWAInstallPrompt';
+import { PlatformSegmentsImportModal } from './components/PlatformSegmentsImportModal';
 
 // Icons
 import { 
@@ -415,6 +416,7 @@ export default function App() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [mobileViewMode, setMobileViewMode] = useState<'map' | 'list'>('map');
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isCentralExcelImportModalOpen, setIsCentralExcelImportModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [showRoleSwitcherDropdown, setShowRoleSwitcherDropdown] = useState(false);
   const [successNotification, setSuccessNotification] = useState('');
@@ -1863,6 +1865,18 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2 relative z-10">
+            {currentUser.role === 'admin' && (
+              <button
+                type="button"
+                onClick={() => setIsCentralExcelImportModalOpen(true)}
+                className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black px-3.5 py-2 rounded-xl transition-all shadow-md cursor-pointer border border-emerald-400/30 active:scale-95"
+                title="استيراد وتحديث قطاعات منصة البنية التحتية لكامل المشاريع (Segment ID.xlsx)"
+              >
+                <FileSpreadsheet className="h-4 w-4 text-emerald-200" />
+                <span className="hidden sm:inline">استيراد قطاعات المنصة (إكسل) 📥</span>
+                <span className="sm:hidden">استيراد إكسل 📥</span>
+              </button>
+            )}
             {canEditProjects && (<button onClick={handleStartAddNewProject} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"><Plus className="h-4 w-4" /><span>{t('app.addNewProject')}</span></button>)}
           </div>
         </div>
@@ -2056,6 +2070,16 @@ export default function App() {
           isAdmin={currentUser.role === 'admin'}
         />
       )}
+
+      {/* Platform Segments Central Excel Import Modal */}
+      <PlatformSegmentsImportModal
+        isOpen={isCentralExcelImportModalOpen}
+        onClose={() => setIsCentralExcelImportModalOpen(false)}
+        onSuccess={() => {
+          setIsCentralExcelImportModalOpen(false);
+          showNotification('☁️ تم تحديث ومزامنة قطاعات البنية التحتية بنجاح لكافة المشاريع!');
+        }}
+      />
 
       {showExitModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">

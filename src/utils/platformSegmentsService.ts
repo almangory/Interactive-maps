@@ -81,6 +81,22 @@ export function isSegmentStatusCancelled(statusStr?: string): boolean {
 }
 
 /**
+ * Determines if a platform segment status indicates initial closure / completion (مغلق أولياً)
+ * When closed initially, it is excluded from being reported as missing from the map.
+ */
+export function isSegmentStatusInitiallyClosed(statusStr?: string): boolean {
+  if (!statusStr) return false;
+  const s = statusStr.trim().toLowerCase();
+  return (
+    s.includes('مغلق') || 
+    s.includes('مقفول') || 
+    s.includes('منتهي') || 
+    s.includes('closed') ||
+    s.includes('initially closed')
+  );
+}
+
+/**
  * Fetch all platform segments for a specific project PO or project name
  */
 export async function fetchPlatformSegmentsForProject(po?: string, projectName?: string): Promise<PlatformSegment[]> {
@@ -237,12 +253,13 @@ export function reconcileProjectSegments(
   for (const seg of platformSegments) {
     totalPlatformLengthMeters += seg.segmentLength || 0;
     const isCancelled = isSegmentStatusCancelled(seg.segmentStatus);
+    const isInitiallyClosed = isSegmentStatusInitiallyClosed(seg.segmentStatus);
 
     // Find if any map feature matches this segment
     const matchedFeature = mapFeatures.find(f => isMapFeatureMatchingSegment(f, seg));
 
     if (isCancelled) {
-      // 🚫 If status is CANCELLED in platform:
+      // 🚫 If status is CANCELLED in platform (ملغي / بانتظار الموافقة على الإلغاء):
       // If it is STILL found on the map, trigger Alert 2 (Must be deleted from map)
       if (matchedFeature) {
         matchedMapFeatureIds.add(matchedFeature.id);
@@ -252,8 +269,19 @@ export function reconcileProjectSegments(
         });
         totalCancelledOnMapLengthMeters += seg.segmentLength || matchedFeature.lengthMeters || 0;
       }
+    } else if (isInitiallyClosed) {
+      // ℹ️ If status is INITIALLY CLOSED in platform (مغلق أولياً / مغلق):
+      // Excluded from missing segments! It is completed/closed, so missing alert is NOT triggered.
+      if (matchedFeature) {
+        matchedMapFeatureIds.add(matchedFeature.id);
+        compliantSegments.push({
+          platformSegment: seg,
+          matchedMapFeature: matchedFeature
+        });
+        totalCompliantLengthMeters += seg.segmentLength || matchedFeature.lengthMeters || 0;
+      }
     } else {
-      // 🟢 If status is ACTIVE/NORMAL in platform:
+      // 🟢 If status is ACTIVE/COORDINATED in platform (نشط، منسق، تركيب جديد...):
       if (matchedFeature) {
         matchedMapFeatureIds.add(matchedFeature.id);
         compliantSegments.push({
@@ -262,7 +290,7 @@ export function reconcileProjectSegments(
         });
         totalCompliantLengthMeters += seg.segmentLength || matchedFeature.lengthMeters || 0;
       } else {
-        // 🔴 NOT on map -> Alert 1 (Missing Segment)
+        // 🔴 NOT on map -> Alert 1 (Missing Segment to Add)
         missingSegments.push(seg);
         totalMissingLengthMeters += seg.segmentLength || 0;
       }

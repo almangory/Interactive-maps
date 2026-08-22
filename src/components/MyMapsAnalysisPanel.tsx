@@ -94,7 +94,8 @@ import { PlatformSegment, SegmentReconciliationSummary } from '../types';
 import { 
   fetchPlatformSegmentsForProject, 
   reconcileProjectSegments, 
-  isSegmentStatusCancelled 
+  isSegmentStatusCancelled,
+  isSegmentStatusInitiallyClosed
 } from '../utils/platformSegmentsService';
 import { PlatformSegmentsImportModal } from './PlatformSegmentsImportModal';
 
@@ -120,7 +121,7 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
   const [platformSegments, setPlatformSegments] = useState<PlatformSegment[]>([]);
   const [isLoadingPlatformSegments, setIsLoadingPlatformSegments] = useState<boolean>(false);
   const [isExcelImportModalOpen, setIsExcelImportModalOpen] = useState<boolean>(false);
-  const [reconciliationFilter, setReconciliationFilter] = useState<'all' | 'missing' | 'cancelled' | 'compliant'>('all');
+  const [reconciliationFilter, setReconciliationFilter] = useState<'all' | 'missing' | 'cancelled' | 'compliant' | 'closed'>('all');
   const [reconciliationSearch, setReconciliationSearch] = useState<string>('');
 
   // Segment & Permit Region Interactive Map Modal State
@@ -1069,15 +1070,17 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                 </span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setIsExcelImportModalOpen(true)}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-indigo-500/40 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
-                title="استيراد وتحديث ملف الإكسل المعتمد من منصة البنية التحتية (Segment ID.xlsx)"
-              >
-                <UploadCloud className="h-3.5 w-3.5 text-cyan-400" />
-                <span>استيراد إكسل 📥</span>
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setIsExcelImportModalOpen(true)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-indigo-500/40 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+                  title="استيراد وتحديث ملف الإكسل المعتمد من منصة البنية التحتية (Segment ID.xlsx)"
+                >
+                  <UploadCloud className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>استيراد إكسل 📥</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -2339,14 +2342,16 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsExcelImportModalOpen(true)}
-                      className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                    >
-                      <UploadCloud className="h-4 w-4" />
-                      <span>استيراد وتحديث الإكسل 📥</span>
-                    </button>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setIsExcelImportModalOpen(true)}
+                        className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                      >
+                        <UploadCloud className="h-4 w-4" />
+                        <span>استيراد وتحديث الإكسل 📥</span>
+                      </button>
+                    )}
 
                     {reconciliationSummary.totalMissingCount > 0 && (
                       <button
@@ -2413,11 +2418,13 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                       onClick={() => {
                         const rows = platformSegments.map((seg, idx) => {
                           const isCancelled = isSegmentStatusCancelled(seg.segmentStatus);
+                          const isClosed = isSegmentStatusInitiallyClosed(seg.segmentStatus);
                           const isMissing = reconciliationSummary.missingSegments.some(m => m.segmentMapId === seg.segmentMapId);
                           const isCancelledOnMap = reconciliationSummary.cancelledOnMapSegments.some(c => c.platformSegment.segmentMapId === seg.segmentMapId);
                           let statusText = 'مطابق ومسقط بالخريطة ✅';
                           if (isCancelled && isCancelledOnMap) statusText = 'ملغي بالمنصة ويجب حذفه من الخريطة 🚫';
                           else if (isCancelled && !isCancelledOnMap) statusText = 'ملغي بالمنصة وغير موجود بالخريطة (سليم) ✨';
+                          else if (isClosed && !isMissing) statusText = 'مغلق أولياً بالمنصة (مستثنى) ℹ️';
                           else if (isMissing) statusText = 'مفقود من الخريطة ويجب رسمه ⚠️';
 
                           return {
@@ -2556,6 +2563,18 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
 
                     <button
                       type="button"
+                      onClick={() => setReconciliationFilter('closed')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        reconciliationFilter === 'closed'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                      }`}
+                    >
+                      مغلق أولياً ({platformSegments.filter(s => isSegmentStatusInitiallyClosed(s.segmentStatus)).length}) ℹ️
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => setReconciliationFilter('compliant')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                         reconciliationFilter === 'compliant'
@@ -2600,6 +2619,7 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                           {platformSegments
                             .filter(seg => {
                               const isCancelled = isSegmentStatusCancelled(seg.segmentStatus);
+                              const isClosed = isSegmentStatusInitiallyClosed(seg.segmentStatus);
                               const isMissing = reconciliationSummary.missingSegments.some(m => m.segmentMapId === seg.segmentMapId);
                               const isCancelledOnMap = reconciliationSummary.cancelledOnMapSegments.some(c => c.platformSegment.segmentMapId === seg.segmentMapId);
                               const isCompliant = reconciliationSummary.compliantSegments.some(c => c.platformSegment.segmentMapId === seg.segmentMapId);
@@ -2607,6 +2627,7 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                               if (reconciliationFilter === 'missing' && !isMissing) return false;
                               if (reconciliationFilter === 'cancelled' && !isCancelledOnMap) return false;
                               if (reconciliationFilter === 'compliant' && !isCompliant) return false;
+                              if (reconciliationFilter === 'closed' && !isClosed) return false;
 
                               if (reconciliationSearch.trim()) {
                                 const q = reconciliationSearch.trim().toLowerCase();
@@ -2620,6 +2641,7 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                             })
                             .map((seg, idx) => {
                               const isCancelled = isSegmentStatusCancelled(seg.segmentStatus);
+                              const isClosed = isSegmentStatusInitiallyClosed(seg.segmentStatus);
                               const isMissing = reconciliationSummary.missingSegments.some(m => m.segmentMapId === seg.segmentMapId);
                               const isCancelledOnMap = reconciliationSummary.cancelledOnMapSegments.some(c => c.platformSegment.segmentMapId === seg.segmentMapId);
                               const isCompliant = reconciliationSummary.compliantSegments.some(c => c.platformSegment.segmentMapId === seg.segmentMapId);
@@ -2663,6 +2685,8 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                       isCancelled
                                         ? 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                        : isClosed
+                                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                                         : 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                                     }`}>
                                       {seg.segmentStatus}
@@ -2688,6 +2712,12 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                                         <span>مسقط ومطابق ✅</span>
                                       </span>
                                     )}
+                                    {!isMissing && !isCancelledOnMap && !isCompliant && isClosed && (
+                                      <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium text-[11px]">
+                                        <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" />
+                                        <span>مغلق أولياً (مستثنى) ℹ️</span>
+                                      </span>
+                                    )}
                                     {!isMissing && !isCancelledOnMap && !isCompliant && isCancelled && (
                                       <span className="inline-flex items-center gap-1 text-slate-400 font-normal">
                                         <span>غير موجود بالخريطة (سليم) ✨</span>
@@ -2711,7 +2741,12 @@ export function MyMapsAnalysisPanel({ projects, selectedProject, onSelectProject
                                         ✨ مطابق ومكتمل
                                       </span>
                                     )}
-                                    {!isMissing && !isCancelledOnMap && !isCompliant && (
+                                    {isClosed && !isCompliant && (
+                                      <span className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-[10px] border border-slate-300 dark:border-slate-700">
+                                        ℹ️ مغلق بالمنصة (مستثنى)
+                                      </span>
+                                    )}
+                                    {!isMissing && !isCancelledOnMap && !isCompliant && !isClosed && (
                                       <span className="text-slate-400 text-[10px]">-</span>
                                     )}
                                   </td>

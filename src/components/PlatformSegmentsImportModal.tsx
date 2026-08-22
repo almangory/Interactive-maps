@@ -21,7 +21,12 @@ import {
   FileCheck
 } from 'lucide-react';
 import { PlatformSegment } from '../types';
-import { parsePlatformSegmentsFromExcel, savePlatformSegmentsBulk } from '../utils/platformSegmentsService';
+import { 
+  parsePlatformSegmentsFromExcel, 
+  savePlatformSegmentsBulk,
+  isSegmentStatusCancelled,
+  isSegmentStatusInitiallyClosed
+} from '../utils/platformSegmentsService';
 
 interface PlatformSegmentsImportModalProps {
   isOpen: boolean;
@@ -133,8 +138,9 @@ export function PlatformSegmentsImportModal({ isOpen, onClose, onSuccess, isRtl 
   // Grouping statistics for preview
   const uniquePOs = Array.from(new Set(parsedSegments.map(s => s.poNumber).filter(Boolean)));
   const uniqueProjects = Array.from(new Set(parsedSegments.map(s => s.projectName).filter(Boolean)));
-  const cancelledCount = parsedSegments.filter(s => s.segmentStatus.includes('ملغي') || s.segmentStatus.includes('إلغاء') || s.segmentStatus.includes('الغاء')).length;
-  const activeCount = parsedSegments.length - cancelledCount;
+  const cancelledCount = parsedSegments.filter(s => isSegmentStatusCancelled(s.segmentStatus)).length;
+  const closedCount = parsedSegments.filter(s => isSegmentStatusInitiallyClosed(s.segmentStatus)).length;
+  const activeCount = parsedSegments.length - cancelledCount - closedCount;
 
   // Filter preview rows
   const filteredPreview = parsedSegments.filter(s => {
@@ -238,7 +244,7 @@ export function PlatformSegmentsImportModal({ isOpen, onClose, onSuccess, isRtl 
           {/* Parsed Data Summary Cards */}
           {parsedSegments.length > 0 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
                 <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/80">
                   <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-semibold">إجمالي القطاعات:</span>
                   <span className="text-base font-black text-slate-900 dark:text-white font-mono">{parsedSegments.length.toLocaleString('ar-SA')}</span>
@@ -248,11 +254,15 @@ export function PlatformSegmentsImportModal({ isOpen, onClose, onSuccess, isRtl 
                   <span className="text-base font-black text-blue-600 dark:text-blue-400 font-mono">{uniquePOs.length || uniqueProjects.length} مشروع</span>
                 </div>
                 <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200/60 dark:border-emerald-900/40">
-                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-semibold">قطاعات معتمدة / نشطة:</span>
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-semibold">معتمدة / نشطة:</span>
                   <span className="text-base font-black text-emerald-700 dark:text-emerald-300 font-mono">{activeCount.toLocaleString('ar-SA')}</span>
                 </div>
+                <div className="p-3 bg-blue-50/50 dark:bg-blue-950/30 rounded-xl border border-blue-200/60 dark:border-blue-900/40">
+                  <span className="text-[11px] text-blue-600 dark:text-blue-400 block font-semibold">مغلقة أولياً (مستثناة):</span>
+                  <span className="text-base font-black text-blue-700 dark:text-blue-300 font-mono">{closedCount.toLocaleString('ar-SA')}</span>
+                </div>
                 <div className="p-3 bg-rose-50/50 dark:bg-rose-950/30 rounded-xl border border-rose-200/60 dark:border-rose-900/40">
-                  <span className="text-[11px] text-rose-600 dark:text-rose-400 block font-semibold">قطاعات ملغاة بالمنصة:</span>
+                  <span className="text-[11px] text-rose-600 dark:text-rose-400 block font-semibold">ملغاة بالمنصة:</span>
                   <span className="text-base font-black text-rose-700 dark:text-rose-300 font-mono">{cancelledCount.toLocaleString('ar-SA')}</span>
                 </div>
               </div>
